@@ -56,22 +56,23 @@ function createSongFieldHTML(title, lyrics = '', link = '') {
     const currentUser = getCurrentUser();
     const isAdmin = currentUser && (currentUser.role === 'admin' || isSuperAdmin(currentUser));
 
+    // APLICANDO rounded-3xl no card e rounded-2xl nos elementos internos
     return `
-    <div class="dynamic-song-card bg-white dark:bg-darkcard p-5 rounded-xl border border-slate-300 dark:border-slate-700 shadow-xl transition-all duration-300 hover:shadow-2xl hover:ring-2 hover:ring-brand-blue" data-song-title="${title}" draggable="true">
+    <div class="dynamic-song-card bg-white dark:bg-darkcard p-5 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-xl transition-all duration-300 hover:shadow-2xl hover:ring-2 hover:ring-brand-blue" data-song-title="${title}" draggable="true">
         <div class="flex justify-between items-center mb-4 border-b pb-3 border-slate-100 dark:border-slate-700">
             <input type="text" value="${title}" class="song-title-input text-2xl font-extrabold text-brand-text dark:text-white flex-grow bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder-gray-500 disabled:cursor-auto" ${!isAdmin ? 'disabled' : ''}>
-            <button type="button" class="remove-song-btn text-red-600 hover:text-white bg-red-100 hover:bg-red-700 font-semibold transition-all duration-200 p-2 rounded-full shadow-md admin-only-input transform hover:scale-110" title="Remover Cântico" ${!isAdmin ? 'disabled' : ''}>
+            <button type="button" class="remove-song-btn text-red-600 hover:text-white bg-red-100 hover:bg-red-700 font-semibold transition-all duration-200 p-2 rounded-2xl shadow-md admin-only-input transform hover:scale-110" title="Remover Cântico" ${!isAdmin ? 'disabled' : ''}>
                 <i class="fas fa-trash-alt"></i>
             </button>
         </div>
         <div class="space-y-4">
             <div class="border-l-4 border-brand-blue/50 pl-3">
                 <label for="lyrics-${uniqueId}" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Letra</label>
-                <textarea id="lyrics-${uniqueId}" rows="4" class="lyrics-input admin-only-input mt-1 block w-full rounded-lg border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white shadow-inner focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition-colors p-3" ${!isAdmin ? 'disabled' : ''}>${lyrics}</textarea>
+                <textarea id="lyrics-${uniqueId}" rows="4" class="lyrics-input admin-only-input mt-1 block w-full rounded-2xl border-slate-300 dark:border-slate-600 bg-brand-light-gray dark:bg-slate-700 text-slate-900 dark:text-white shadow-inner focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition-colors p-3" ${!isAdmin ? 'disabled' : ''}>${lyrics}</textarea>
             </div>
             <div class="border-l-4 border-slate-500/50 pl-3">
                 <label for="link-${uniqueId}" class="block text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">Link (YouTube/Spotify)</label>
-                <input type="url" id="link-${uniqueId}" value="${link}" class="link-input admin-only-input mt-1 block w-full rounded-lg border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white shadow-inner focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition-colors text-sm p-3" placeholder="https://..." ${!isAdmin ? 'disabled' : ''}>
+                <input type="url" id="link-${uniqueId}" value="${link}" class="link-input admin-only-input mt-1 block w-full rounded-2xl border-slate-300 dark:border-slate-600 bg-brand-light-gray dark:bg-slate-700 text-slate-900 dark:text-white shadow-inner focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition-colors text-sm p-3" placeholder="https://..." ${!isAdmin ? 'disabled' : ''}>
             </div>
         </div>
     </div>
@@ -151,12 +152,11 @@ export function setupGeneratorModalForUser() {
         actions.classList.add('hidden');
         formInputs.forEach(input => input.disabled = true);
         adminInputAreas.forEach(area => area.classList.add('hidden'));
-        // CORREÇÃO 1: Membros comuns devem ver o Histórico por padrão
+        // Membros comuns devem ver o Histórico por padrão
         historicoTabBtn.click();
     }
     
-    // CORREÇÃO 2: Garante que o histórico seja renderizado na abertura do modal, 
-    // pois o listener do Firebase já terá preenchido allRepertories
+    // Força a renderização do histórico na abertura do modal.
     renderRepertoryHistory();
 
     // Initialize privacy toggle listener
@@ -250,7 +250,7 @@ export function initializeGeneratorEventListeners() {
             pane.classList.toggle('hidden', pane.id !== `tab-${tabName}`);
         });
 
-        // CORREÇÃO 3: Garante que o histórico seja renderizado quando a aba Histórico é clicada.
+        // Garante que o histórico seja renderizado quando a aba Histórico é clicada.
         if (tabName === 'historico') {
             renderRepertoryHistory();
         }
@@ -406,12 +406,12 @@ export function renderRepertoryHistory() {
     const isCurrentUserSuperAdmin = isSuperAdmin(currentUser);
     const isAdmin = currentUser.role === 'admin' || isCurrentUserSuperAdmin;
 
-    // CORREÇÃO 4: Lógica de filtro mais robusta para visibilidade (Público vs Privado)
+    // Lógica de filtro para garantir que os repertórios sejam visíveis.
     const filteredRepertories = allRepertories.filter(rep => {
         // Se isPrivate não estiver definido ou for explicitamente false, é público.
         if (!rep.isPrivate || rep.isPrivate === false) return true; 
         
-        // Se for privado, só mostra se o usuário for o criador, Admin ou Super Admin.
+        // Se for privado, só mostra se o usuário for: o criador, Admin, ou Super Admin.
         return (rep.createdBy === currentUser.username) || isAdmin || isCurrentUserSuperAdmin;
     });
 
@@ -427,21 +427,28 @@ export function renderRepertoryHistory() {
         const isCreator = currentUser && rep.createdBy === currentUser.username;
         const canEditOrDelete = isAdmin && (isCreator || isCurrentUserSuperAdmin);
 
+        // OBTENDO O NOME COMPLETO DO CRIADOR A PARTIR DO USERNAME
+        const creatorName = rep.createdBy ? rep.createdBy.split('@')[0].toUpperCase() : 'Desconhecido';
+        
+        // APLICANDO CLASSES PREMIUM DE ARREDONDAMENTO
         const adminButtons = canEditOrDelete ? `
-            <button data-id="${rep.id}" class="edit-repertory-btn bg-slate-100 text-slate-700 font-semibold py-1.5 px-3 rounded-full hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 text-xs shadow-sm transform hover:scale-[1.02]">Editar</button>
-            <button data-id="${rep.id}" class="delete-repertory-btn text-red-500 hover:text-red-700 text-lg p-1 transition-colors"><i class="fas fa-trash-alt"></i></button>
+            <button data-id="${rep.id}" class="edit-repertory-btn bg-slate-100 text-slate-700 font-semibold py-1.5 px-3 rounded-2xl hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 text-xs shadow-md transform hover:scale-[1.02] transition-all">Editar</button>
+            <button data-id="${rep.id}" class="delete-repertory-btn text-red-500 hover:text-red-700 text-lg p-1 transition-colors" title="Excluir"><i class="fas fa-trash-alt"></i></button>
         ` : '';
         
-        const privacyTag = rep.isPrivate ? '<span class="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Privado</span>' : '';
+        const privacyTag = rep.isPrivate ? '<span class="ml-2 px-2 py-0.5 text-xs font-semibold rounded-2xl bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 shadow-sm">Privado</span>' : '';
 
         return `
-            <div class="bg-white dark:bg-darkcard p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-4 shadow-md">
+            <div class="bg-white dark:bg-darkcard p-4 rounded-3xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-4 shadow-xl hover:shadow-2xl transition-all duration-300">
                 <div>
                     <p class="font-bold text-brand-text dark:text-white">${title}${privacyTag}</p>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">${formattedDate}</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        ${formattedDate} 
+                        <span class="ml-3 text-xs italic text-brand-blue/70">por ${creatorName}</span>
+                    </p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button data-id="${rep.id}" class="view-repertory-btn bg-sky-100 text-sky-700 font-semibold py-1.5 px-3 rounded-full hover:bg-sky-200 dark:bg-sky-900 dark:text-sky-300 dark:hover:bg-sky-800 text-xs shadow-sm transform hover:scale-[1.02]">Visualizar</button>
+                    <button data-id="${rep.id}" class="view-repertory-btn bg-sky-100 text-sky-700 font-semibold py-1.5 px-3 rounded-2xl hover:bg-sky-200 dark:bg-sky-900 dark:text-sky-300 dark:hover:bg-sky-800 text-xs shadow-md transform hover:scale-[1.02] transition-all">Visualizar</button>
                     ${adminButtons}
                 </div>
             </div>
@@ -509,8 +516,9 @@ function renderSingleRepertoryView(repertoryData) {
     const contentDiv = document.getElementById('repertory-viewer-content');
     if (!contentDiv) return;
 
-    const { songs, theme, date } = repertoryData;
+    const { songs, theme, date, createdBy } = repertoryData;
     const songsWithContent = songs ? songs.filter(s => s.lyrics || s.link) : [];
+    const creatorName = createdBy ? createdBy.split('@')[0].toUpperCase() : 'Desconhecido';
 
     if (songsWithContent.length === 0) {
         contentDiv.innerHTML = `<div class="text-center text-slate-500 dark:text-slate-400 py-10"><i class="fas fa-music fa-2x mb-3"></i><p>Este repertório está vazio.</p></div>`;
@@ -522,13 +530,14 @@ function renderSingleRepertoryView(repertoryData) {
     let html = `<div class="text-center mb-6">
                             <h3 class="text-3xl font-bold text-brand-text dark:text-white">Roteiro de Cânticos</h3>
                             <p class="text-brand-blue font-semibold text-lg">${theme || formattedDate}</p>
+                            <p class="text-sm italic text-slate-500 dark:text-slate-400 mt-1">Criado por: ${creatorName}</p>
                         </div>
                         <div id="repertory-accordion" class="space-y-4">`;
 
     songsWithContent.forEach((song) => {
         const embedHtml = getEmbedHtml(song.link);
         html += `
-            <div class="accordion-item bg-white dark:bg-darkcard rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-xl hover:shadow-2xl transition-shadow">
+            <div class="accordion-item bg-white dark:bg-darkcard rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-xl hover:shadow-2xl transition-shadow">
                 <button class="accordion-header w-full flex justify-between items-center text-left p-5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors focus:outline-none border-l-4 border-brand-blue">
                     <span class="font-bold text-xl text-brand-text dark:text-white">${song.title}</span>
                     <i class="fas fa-chevron-down transition-transform text-brand-blue text-lg"></i>
@@ -538,7 +547,7 @@ function renderSingleRepertoryView(repertoryData) {
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                             <div class="lyrics-container">
                                 <h5 class="font-bold text-brand-blue mb-3 text-center text-md uppercase tracking-wider border-b pb-1">Letra</h5>
-                                <pre class="text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-sans text-base leading-relaxed text-left p-4 rounded-lg bg-white dark:bg-slate-800 shadow-inner border border-slate-200 dark:border-slate-700">${song.lyrics || 'Letra não disponível.'}</pre>
+                                <pre class="text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-sans text-base leading-relaxed text-left p-4 rounded-2xl bg-brand-light-gray dark:bg-slate-800 shadow-inner border border-slate-200 dark:border-slate-700">${song.lyrics || 'Letra não disponível.'}</pre>
                             </div>
                             <div class="player-container">
                                  <h5 class="font-bold text-brand-blue mb-3 text-center text-md uppercase tracking-wider border-b pb-1">Mídia</h5>
@@ -562,19 +571,21 @@ function renderSingleRepertoryView(repertoryData) {
             button.classList.toggle('active');
             
             if (content.style.maxHeight && content.style.maxHeight !== '0px') {
-                // Fecha
+                // Fechando
                 content.style.maxHeight = '0px';
                 // Remove padding da div interna
                 contentInner.style.paddingTop = '0';
                 contentInner.style.paddingBottom = '0';
+                button.querySelector('i').classList.remove('rotate-180');
             } else {
-                // Abre
+                // Abrindo
                 // Adiciona padding
                 contentInner.style.paddingTop = '1.5rem';
                 contentInner.style.paddingBottom = '1.5rem';
                 // Define maxHeight baseado no scrollHeight do conteúdo interno mais o padding
                 const padding = 50; 
                 content.style.maxHeight = (contentInner.scrollHeight + padding) + "px"; 
+                button.querySelector('i').classList.add('rotate-180');
             }
         });
     });
@@ -591,6 +602,7 @@ async function deleteRepertory(repertoryId) {
     openConfirmationModal(
         "Tem certeza que deseja excluir este repertório? Esta ação não pode ser desfeita.",
         async () => {
+            setGeneratorButtonsLoading(true);
             showGeneratorFeedback("Excluindo...", false, -1); // -1 to keep visible
             try {
                 const db = getDB();
@@ -617,7 +629,7 @@ async function generatePptx() {
     showGeneratorFeedback('Gerando PPTX, por favor aguarde...', false, -1);
 
     try {
-        const { songs, theme, date } = getSongDataFromForm();
+        const { songs, theme, date, createdBy } = getSongDataFromForm();
         const songsWithLyrics = songs.filter(s => s.lyrics);
         
         // Adiciona feedback se não for Admin
@@ -641,13 +653,14 @@ async function generatePptx() {
 
         let pptx = new PptxGenJS();
         const formattedDate = date ? new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric'}) : '';
+        const creatorName = createdBy ? createdBy.split('@')[0].toUpperCase() : 'Desconhecido';
         
         pptx.defineLayout({ name: 'SONG_LAYOUT', width: 16, height: 9 });
         pptx.defineSlideMaster({
             title: 'SONG_MASTER',
             background: { color: '000000' },
             objects: [
-                { 'text': { text: 'Ministério Uziel', options: { x: 0.5, y: 8.2, w: '90%', fontFace: 'Poppins', fontSize: 14, color: 'FFFFFF', align: 'left', opacity: 0.7 } } },
+                { 'text': { text: `Ministério Uziel (Criado por: ${creatorName})`, options: { x: 0.5, y: 8.2, w: '90%', fontFace: 'Poppins', fontSize: 14, color: 'FFFFFF', align: 'left', opacity: 0.7 } } },
                 { 'text': { text: formattedDate, options: { x: 0.5, y: 8.2, w: '90%', fontFace: 'Poppins', fontSize: 14, color: 'FFFFFF', align: 'right', opacity: 0.7 } } },
             ],
         });
@@ -699,6 +712,7 @@ async function generatePptx() {
         const fileNameDate = date || 'data';
         const filename = `Canticos_Uziel_${theme.replace(/\s+/g, '_') || fileNameDate}.pptx`;
         await pptx.writeFile({ fileName: filename });
+        logAction('Gerou PPTX', 'Gerador de Repertório', `PPTX gerado para ${theme || formattedDate}`);
         showGeneratorFeedback('PPTX gerado com sucesso!', false);
 
     } catch (error) {
@@ -715,7 +729,7 @@ function generatePdf() {
     showGeneratorFeedback('Gerando PDF, por favor aguarde...', false, -1);
 
     try {
-        const { songs, theme, date } = getSongDataFromForm();
+        const { songs, theme, date, createdBy } = getSongDataFromForm();
         const songsWithLyrics = songs.filter(s => s.lyrics);
         
         // Adiciona feedback se não for Admin
@@ -743,6 +757,7 @@ function generatePdf() {
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 40;
         const formattedDate = date ? new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric'}) : '';
+        const creatorName = createdBy ? createdBy.split('@')[0].toUpperCase() : 'Desconhecido';
 
         const addHeaderFooter = (docInstance) => {
             const pageCount = docInstance.internal.getNumberOfPages();
@@ -750,7 +765,8 @@ function generatePdf() {
                 docInstance.setPage(i);
                 docInstance.setFontSize(9);
                 docInstance.setTextColor(150);
-                docInstance.text('Ministério Uziel', margin, margin - 10);
+                // Adiciona o nome do criador no footer/header
+                docInstance.text(`Criado por: ${creatorName}`, margin, margin - 10);
                 docInstance.text(formattedDate, pageWidth - margin, margin - 10, { align: 'right' });
                 docInstance.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - (margin / 2), { align: 'center' });
             }
@@ -811,6 +827,7 @@ function generatePdf() {
         const fileNameDate = date || 'data';
         const filename = `Roteiro_Uziel_${theme.replace(/\s+/g, '_') || fileNameDate}.pdf`;
         doc.save(filename);
+        logAction('Gerou PDF', 'Gerador de Repertório', `PDF gerado para ${theme || formattedDate}`);
         showGeneratorFeedback('PDF gerado com sucesso!', false);
 
     } catch(error) {
@@ -843,7 +860,7 @@ function getEmbedHtml(url) {
             embedUrl = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${origin}`;
         }
 
-        return `<div class="aspect-w-16 aspect-h-9 w-full h-full relative" style="padding-bottom: 56.25%; height: 0;"><iframe src="${embedUrl}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen class="absolute top-0 left-0 w-full h-full rounded-lg shadow-xl"></iframe></div>`;
+        return `<div class="aspect-w-16 aspect-h-9 w-full h-full relative" style="padding-bottom: 56.25%; height: 0;"><iframe src="${embedUrl}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen class="absolute top-0 left-0 w-full h-full rounded-3xl shadow-xl"></iframe></div>`;
     }
 
     // Spotify Match
@@ -857,5 +874,5 @@ function getEmbedHtml(url) {
     }
     
     // Fallback/Generic Link
-    return `<div class="mt-4 text-center"><a href="${url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-slate-500 text-white font-semibold py-1.5 px-3 rounded-full text-sm hover:bg-slate-600 transition-colors shadow-md"><i class="fas fa-link"></i>Acessar Link Externo</a></div>`;
+    return `<div class="mt-4 text-center"><a href="${url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-slate-500 text-white font-semibold py-1.5 px-3 rounded-2xl text-sm hover:bg-slate-600 transition-colors shadow-md"><i class="fas fa-link"></i>Acessar Link Externo</a></div>`;
 }

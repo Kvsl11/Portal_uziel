@@ -14,27 +14,27 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #cbd5e1; /* slate-300 */
+    background: #29aae2; /* Cor principal solicitada */
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8; /* slate-400 */
+    background: #1e8ed9; /* Azul um pouco mais escuro para feedback visual no hover */
 }
 .dark ::-webkit-scrollbar-thumb {
-    background: #475569; /* slate-600 */
+    background: #29aae2; /* Cor principal solicitada */
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-    background: #64748b; /* slate-500 */
+    background: #1e8ed9; /* Azul um pouco mais escuro para feedback visual no hover */
 }
 
 /* FIREFOX - Requires less specific styling */
 .overflow-y-auto {
     scrollbar-width: thin;
-    scrollbar-color: #94a3b8 #f3f4f6; /* thumb color | track color */
+    scrollbar-color: #29aae2 #f3f4f6; /* thumb color | track color */
 }
 .dark .overflow-y-auto {
-    scrollbar-color: #64748b #1e293b;
+    scrollbar-color: #29aae2 #1e293b;
 }
 /* END SCROLLBAR CUSTOMIZATION */
 
