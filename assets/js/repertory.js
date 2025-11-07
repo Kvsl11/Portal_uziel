@@ -195,7 +195,7 @@ export function initializeGeneratorEventListeners() {
 
         // Reset selector UI
         const selectorWrapper = document.getElementById('song-type-selector-wrapper');
-        const customInputWrapper = document.getElementById('custom-song-type-input-wrapper'); // CORREÇÃO: Usando o ID correto
+        const customInputWrapper = document.getElementById('custom-song-type-wrapper');
         selector.value = songFields[0]?.title || '';
         selectorWrapper.classList.remove('hidden');
         customInputWrapper.classList.add('hidden');
@@ -280,10 +280,10 @@ export function initializeGeneratorEventListeners() {
             opacity: 0.3;
         }
         .dynamic-song-card.drag-over-top {
-            border-top: 4px solid var(--brand-blue-color, #29aae2); /* Usa cor da marca */
+            border-top: 4px solid var(--brand-blue-color, #29aae2); 
         }
         .dynamic-song-card.drag-over-bottom {
-            border-bottom: 4px solid var(--brand-blue-color, #29aae2); /* Usa cor da marca */
+            border-bottom: 4px solid var(--brand-blue-color, #29aae2); 
         }
     `;
     document.head.appendChild(style);
@@ -470,8 +470,8 @@ export function renderRepertoryHistory() {
         // Se isPrivate não estiver definido ou for explicitamente false, é público.
         if (!rep.isPrivate || rep.isPrivate === false) return true; 
         
-        // Se for privado, só mostra se o usuário for: o criador, Admin, ou Super Admin.
-        return (rep.createdBy === currentUser.username) || isAdmin || isCurrentUserSuperAdmin;
+        // CORREÇÃO CRÍTICA: Se for privado, só mostra para o criador OU Super Admin.
+        return (rep.createdBy === currentUser.username) || isCurrentUserSuperAdmin;
     });
 
     if (filteredRepertories.length === 0) {
@@ -652,11 +652,7 @@ function renderSingleRepertoryView(repertoryData) {
 
 async function deleteRepertory(repertoryId) {
     const currentUser = getCurrentUser();
-    // Adiciona feedback se não for Admin
-    if (!currentUser || (currentUser.role !== 'admin' && !isSuperAdmin(currentUser))) {
-        showGeneratorFeedback("Você não tem permissão de administrador para excluir repertórios.", true);
-        return;
-    }
+    if (!currentUser || (currentUser.role !== 'admin' && !isSuperAdmin(currentUser))) return;
 
     openConfirmationModal(
         "Tem certeza que deseja excluir este repertório? Esta ação não pode ser desfeita.",
@@ -676,6 +672,9 @@ async function deleteRepertory(repertoryId) {
             } catch (error) {
                 console.error("Erro ao excluir repertório: ", error);
                 showGeneratorFeedback("Erro ao excluir repertório.", true);
+            } finally {
+                // CORREÇÃO CRÍTICA: Reabilitar botões AQUI
+                setGeneratorButtonsLoading(false);
             }
         }
     );
