@@ -13,7 +13,7 @@ function generateAndDisplayRota(forceRandom = false) {
     rotaContent.style.display = 'none';
 
     // Lista fixa de salmistas (a lista real deve ser mantida na autenticação ou em Firebase)
-    const salmistasSource = ["ANA BONIN", "ÊNIO HENRIQUE", "WILLIAN FALAVINA", "CAMILA FALAVINA", "JUNIOR CAVALCANTE", "KARLA VANESSA", "KAIO VINICIUS", "MEL BUZZO", "ALEXANDRE MANDELI", "JULIO CÉSAR"];
+    const salmistasSource = ["ANA BONIN", "ÊNIO HENRIQUE", "WILLIAN FALAVINA", "CAMILA FALAVINA", "JUNIOR CAVALCANTE", "KARLA VANESSA", "KAIO VINICIUS", "JULIO CÉSAR"];
 
     if (salmistasSource.length < 2) {
         rotaTableBody.innerHTML = '<tr><td colspan="3" class="text-center p-4">São necessários ao menos 2 salmistas.</td></tr>';
