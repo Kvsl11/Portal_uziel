@@ -59,15 +59,13 @@
 
     <!-- PWA Service Worker Registration -->
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./assets/service-worker.js').then(registration => {
-                    console.log('Service Worker registrado com sucesso!');
-                }).catch(err => {
-                    console.log('Falha ao registrar o Service Worker: ', err);
-                });
-            });
-        }
+    if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/Portal_uziel/assets/js/service-worker.js', { scope: '/Portal_uziel/' })
+        .then(reg => console.log('[SW] Registrado:', reg.scope))
+        .catch(err => console.error('[SW] Falha ao registrar:', err));
+    });
+    }
     </script>
 
     <!-- Global Security Block (Mantido aqui, mas idealmente configurado via server/PWA) -->
