@@ -26,7 +26,9 @@ export const getAuditLogs = () => [...allAuditLogs];
 export const getServerTimestamp = () => serverTimestamp();
 export const getDocRef = (path, docId) => doc(db, path, docId);
 export const getCollectionRef = (path) => collection(db, path);
-export { updateDoc, increment, writeBatch, runTransaction, setDoc, deleteDoc, addDoc, getDoc, getDocs, query, where, orderBy };
+// CORREÇÃO: Adicionando 'doc' para que possa ser importado pelo auth.js
+export { updateDoc, increment, writeBatch, runTransaction, setDoc, deleteDoc, addDoc, getDoc, getDocs, query, where, orderBy, doc };
+
 
 // --- FIREBASE INITIALIZATION ---
 export async function initializeFirebase(onAuthChangeCallback) {

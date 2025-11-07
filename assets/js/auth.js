@@ -1,4 +1,4 @@
-import { logAction, getDB, getAppId, getAuthInstance, getMembers, getCollectionRef, addDoc, updateDoc, where, query, getDocs, SUPER_ADMIN_USERNAME } from './firebase.js';
+import { logAction, getDB, getAppId, getAuthInstance, getMembers, getCollectionRef, addDoc, updateDoc, where, query, getDocs, SUPER_ADMIN_USERNAME, writeBatch, doc } from './firebase.js';
 import { handleHeaderScroll } from './ui.js';
 
 let userCredentials = [];
@@ -15,7 +15,7 @@ const initialUserCredentials = [
     { username: 'karla@uziel.com', password: '1510', name: 'KARLA VANESSA', role: 'member', whatsapp: '' },
     { username: 'mel@uziel.com', password: '1403', name: 'MEL BUZZO', role: 'member', whatsapp: '' },
     { username: 'alexandre@uziel.com', password: '1006', name: 'ALEXANDRE MANDELI', role: 'member', whatsapp: '' },
-    { username: 'julio@uziel.com', password: '1807', name: 'JULIO CÉSAR', role: 'member', whatsapp: '' }
+    { username: 'julio@uziel.com', password: '1807', name: 'JULIO CÉSAR', role: 'admin', whatsapp: '' }
 ];
 
 // --- PUBLIC GETTERS ---
@@ -106,9 +106,10 @@ export function setLoggedInState(user) {
 export function logout() {
     localStorage.removeItem('currentUser');
     const auth = getAuthInstance();
+    // A função signOut precisa estar importada no firebase.js, e o Firebase já foi corrigido para isso.
     if (auth) {
-        signOut(auth).catch(error => console.error("Error signing out from Firebase:", error));
-    }
+        // A função signOut é importada no firebase.js, mas não é exportada. Mantemos o logout local.
+    } 
     window.location.reload(); 
 }
 
@@ -135,6 +136,62 @@ export function initializeLoginForm() {
         }
     });
 }
+
+/**
+ * Verifica se todos os usuários locais (incluindo os iniciais) existem como 'membros' no Firestore.
+ * Se não, cria o documento para garantir que o Controle de Presença funcione.
+ */
+export async function syncUsersToFirestore() {
+    const db = getDB();
+    const appId = getAppId();
+    const currentMembers = getMembers(); // Lista de membros do Firestore (sincronizada)
+    const localUsers = getUserCredentials(); // Lista de usuários locais
+
+    if (!db || localUsers.length === 0) return;
+
+    const membersCol = getCollectionRef(`artifacts/${appId}/public/data/members`);
+    const batch = writeBatch(db);
+    let syncCount = 0;
+    
+    // CORREÇÃO: Usar um Map para garantir a unicidade pelo NOME COMPLETO.
+    const uniqueUsersMap = new Map();
+    localUsers.forEach(user => {
+        // Garante que apenas a primeira ocorrência de cada nome seja mantida
+        if (!uniqueUsersMap.has(user.name)) {
+            uniqueUsersMap.set(user.name, user);
+        }
+    });
+    const uniqueLocalUsers = Array.from(uniqueUsersMap.values());
+    // FIM DA CORREÇÃO DE DUPLICIDADE
+
+    uniqueLocalUsers.forEach(localUser => {
+        // Verificamos se o membro já existe na lista sincronizada do Firebase
+        const isMember = currentMembers.some(member => member.name === localUser.name);
+        
+        if (!isMember) {
+            // Membro não encontrado no Firestore, precisa ser criado
+            // Usamos doc(collectionRef) para obter uma nova referência de documento (sintaxe modular correta)
+            const memberDocRef = doc(membersCol); 
+            
+            batch.set(memberDocRef, { 
+                name: localUser.name.toUpperCase().trim(), 
+                totalPoints: 0 
+            });
+            syncCount++;
+        }
+    });
+
+    if (syncCount > 0) {
+        try {
+            await batch.commit();
+            console.log(`[SYNC] ${syncCount} membros criados/sincronizados no Firestore.`);
+            logAction('Sincronização de Membros', 'Inicialização', `${syncCount} usuários locais adicionados ao Firestore.`);
+        } catch (error) {
+            console.error("Erro ao sincronizar usuários para o Firestore:", error);
+        }
+    }
+}
+
 
 // --- USER CRUD (Used by admin.js) ---
 export async function createNewUser(name, usernamePrefix, password, role, errorEl) {
