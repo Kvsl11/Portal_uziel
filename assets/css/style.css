@@ -5,36 +5,40 @@
     height: 10px;
 }
 
+/* Usamos as cores exatas do Tailwind config para o fundo:
+   bg-brand-light-gray (#f8fafc) no modo claro e darkcard (#1a2233) no escuro.
+   A cor fixa aqui é uma aproximação que funciona fora do escopo do Tailwind.
+*/
 ::-webkit-scrollbar-track {
-    background: #f3f4f6; /* bg-gray-100 */
+    background: #f8fafc; /* Cor base clara */
     border-radius: 10px;
 }
 .dark ::-webkit-scrollbar-track {
-    background: #1e293b; /* darkcard */
+    background: #1a2233; /* darkcard */
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #29aae2; /* Cor principal solicitada */
+    background: #29aae2; /* Cor principal solicitada (brand-blue) */
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #1e8ed9; /* Azul um pouco mais escuro para feedback visual no hover */
+    background: #1c88bb; /* brand-dark-blue */
 }
 .dark ::-webkit-scrollbar-thumb {
-    background: #29aae2; /* Cor principal solicitada */
+    background: #29aae2; /* Cor principal solicitada (brand-blue) */
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-    background: #1e8ed9; /* Azul um pouco mais escuro para feedback visual no hover */
+    background: #1c88bb; /* brand-dark-blue */
 }
 
 /* FIREFOX - Requires less specific styling */
 .overflow-y-auto {
     scrollbar-width: thin;
-    scrollbar-color: #29aae2 #f3f4f6; /* thumb color | track color */
+    scrollbar-color: #29aae2 #f8fafc; /* thumb color | track color (brand-blue | brand-light-gray) */
 }
 .dark .overflow-y-auto {
-    scrollbar-color: #29aae2 #1e293b;
+    scrollbar-color: #29aae2 #1a2233; /* brand-blue | darkcard */
 }
 /* END SCROLLBAR CUSTOMIZATION */
 
@@ -44,7 +48,7 @@ html { scroll-behavior: smooth; }
 body { display: flex; flex-direction: column; min-height: 100vh; }
 main { flex-grow: 1; }
     
-/* HEADER ENHANCEMENTS */
+/* HEADER ENHANCEMENTS (Reforçado com backdrop-blur-md) */
 #header { 
     transition: padding 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
     backdrop-filter: blur(8px); /* Aplicando blur sempre para efeito flutuante */
@@ -52,26 +56,27 @@ main { flex-grow: 1; }
     background-color: transparent;
 }
 .header-scrolled {
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    padding-top: 0.75rem; /* Ajustado */
+    padding-bottom: 0.75rem; /* Ajustado */
+    /* Usando sombra mais sutil para o estilo premium */
+    box-shadow: 0 5px 15px -3px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.05); 
     background-color: rgb(255 255 255 / 0.95); /* Leve transparência no modo claro */
 }
 .dark .header-scrolled {
-    background-color: rgb(15 23 42 / 0.95); /* Leve transparência no modo escuro (darkbg) */
+    background-color: rgb(26 34 51 / 0.95); /* darkcard */
 }
 .header-scrolled h1 { font-size: 1.5rem; }
 /* END HEADER ENHANCEMENTS */
 
 
 #home {
-    background-image: url('../4.jpg');
+    background-image: url('../img/4.jpg'); /* CORRIGIDO: Adicionado /img/ */
     background-size: cover;
     background-position: center;
     position: relative;
 }
 #verse {
-    background-image: url('../6.png');
+    background-image: url('../img/6.png'); /* CORRIGIDO: Adicionado /img/ */
     background-size: cover;
     background-position: center;
     position: relative;
@@ -79,7 +84,7 @@ main { flex-grow: 1; }
 .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.7); z-index: 1; }
 .content-wrapper { position: relative; z-index: 2; }
 
-/* CARD ENHANCEMENTS */
+/* CARD ENHANCEMENTS (Arredondamento 2xl e Sombra Premium) */
 .portal-card-wrapper { 
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.5s ease-out, padding 0.5s ease-out, margin 0.5s ease-out; 
     width: 100%; 
@@ -96,7 +101,7 @@ main { flex-grow: 1; }
 
 .portal-card:hover { 
     transform: translateY(-5px); 
-    box-shadow: 0 10px 20px -5px rgb(0 0 0 / 0.15), 0 6px 10px -6px rgb(0 0 0 / 0.1);
+    box-shadow: 0 15px 30px -5px rgb(0 0 0 / 0.15), 0 8px 15px -6px rgb(0 0 0 / 0.1); /* Sombra maior no hover */
     border-color: #29aae2;
 }
 .portal-card-wrapper.filtered-out, .admin-only.hidden, .super-admin-only.hidden { transform: scale(0.85); opacity: 0; width: 0 !important; padding: 0 !important; margin: 0 !important; pointer-events: none; overflow: hidden; }
@@ -115,48 +120,52 @@ main { flex-grow: 1; }
     background-color: #29aae2; 
     color: white; 
     transform: scale(1.05); 
-    box-shadow: 0 2px 4px rgba(41, 170, 226, 0.4);
+    box-shadow: 0 2px 8px rgba(41, 170, 226, 0.6); /* Sombra mais forte no ativo */
 }
 .dark .filter-btn.active {
-    box-shadow: 0 2px 4px rgba(41, 170, 226, 0.6);
+    box-shadow: 0 2px 8px rgba(41, 170, 226, 0.8);
 }
 /* END FILTER ENHANCEMENTS */
 
 
+/* TABLE ENHANCEMENTS */
 .rota-table th, .audit-table th { padding: 12px 16px; text-align: left; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; border-bottom: 2px solid #e5e7eb; }
 .dark .rota-table th, .dark .audit-table th { border-bottom: 2px solid #334155; }
     
 .rota-table td, .audit-table td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; }
 .dark .rota-table td, .dark .audit-table td { border-bottom: 1px solid #334155; }
     
-.rota-table tbody tr:hover, .audit-table tbody tr:hover { background-color: #f9fafb; }
+.rota-table tbody tr:hover, .audit-table tbody tr:hover { background-color: #f8fafc; } /* brand-light-gray */
 .dark .rota-table tbody tr:hover, .dark .audit-table tbody tr:hover { background-color: #1f2937; }
 
 .rota-table tbody tr.current-month { background-color: #e0f2fe; border-left: 5px solid #29aae2; }
 .dark .rota-table tbody tr.current-month { background-color: #0c4a6e; border-left: 5px solid #29aae2; } 
+/* END TABLE ENHANCEMENTS */
 
 .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
 .reveal.visible { opacity: 1; transform: translateY(0); }
 
+/* ATTENDANCE BUTTONS ENHANCEMENTS */
 .attendance-buttons.selected .selected-btn {
     border: 3px solid #29aae2;
     transform: scale(1.05);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 .attendance-buttons.selected button:not(.selected-btn) {
-    opacity: 0.6;
+    opacity: 0.5; /* Mais opaco para dar mais destaque ao ativo */
     transition: opacity 0.2s ease-in-out;
 }
 .attendance-buttons.selected button:not(.selected-btn):hover {
-    opacity: 1;
+    opacity: 0.8; /* Aumenta um pouco no hover */
 }
+/* END ATTENDANCE BUTTONS ENHANCEMENTS */
 
 #mobile-menu { transition: opacity 0.3s ease-in-out; }
 #mobile-menu nav a { opacity: 0; transform: translateY(20px); transition: opacity 0.4s ease, transform 0.4s ease; }
 body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
     
 #main-login-overlay {
-    background-image: url('../5.png');
+    background-image: url('../img/5.png'); /* CORRIGIDO: Adicionado /img/ */
     background-size: cover;
     background-position: center;
     transition: opacity 0.5s ease-in-out;
@@ -166,7 +175,7 @@ body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
     display: none !important;
 }
     
-/* New Tab Styles */
+/* TAB STYLES ENHANCEMENTS */
 .generator-tab-btn.active {
     color: #29aae2;
     border-color: #29aae2;
@@ -175,7 +184,7 @@ body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
 .attendance-tab-button.active {
     background-color: #29aae2;
     color: white !important;
-    box-shadow: 0 2px 5px rgba(41, 170, 226, 0.5);
+    box-shadow: 0 2px 8px rgba(41, 170, 226, 0.6);
 }
 .attendance-tab-button.active span, .attendance-tab-button.active i {
     color: white !important;
@@ -193,11 +202,12 @@ body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
 .dark .attendance-tab-button:not(.active):hover {
     background-color: #334155; /* slate-700 */
 }
+/* END TAB STYLES ENHANCEMENTS */
 
 /* IMPROVED ADMIN INPUT DISABLED STATE */
 .admin-only-input:disabled,
 .admin-only-input-area .admin-only-input:disabled {
-    background-color: #f3f4f6 !important; /* bg-gray-100 mais claro */
+    background-color: #f8fafc !important; /* brand-light-gray */
     cursor: not-allowed !important;
     color: #94a3b8 !important; /* slate-400 */
     border-color: #e5e7eb !important; /* gray-200 */
@@ -205,13 +215,14 @@ body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
 }
 .dark .admin-only-input:disabled,
 .dark .admin-only-input-area .admin-only-input:disabled {
-    background-color: #1e293b !important; /* darkcard */
+    background-color: #1a2233 !important; /* darkcard */
     color: #64748b !important; /* slate-500 */
     border-color: #334155 !important; /* slate-700 */
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 /* END IMPROVED ADMIN INPUT DISABLED STATE */
     
+/* ACCORDION (REPERTORY VIEWER) ENHANCEMENTS */
 .accordion-content {
     max-height: 0;
     overflow: hidden;
@@ -229,6 +240,7 @@ body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
 .accordion-header.active i {
     transform: rotate(180deg);
 }
+/* END ACCORDION (REPERTORY VIEWER) ENHANCEMENTS */
     
 /* Playlist Modal Styles */
 .playlist-item {
@@ -243,8 +255,9 @@ body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
     background-color: #115e59; /* teal-900 */
     border-color: #2dd4bf; /* teal-400 */
 }
+/* END Playlist Modal Styles */
 
-/* Toggle Switch Styles */
+/* Toggle Switch Styles (Mantido) */
 .toggle-switch {
     position: relative;
     display: inline-block;
@@ -288,33 +301,34 @@ input:checked + .toggle-slider {
 input:checked + .toggle-slider:before {
     transform: translateX(22px);
 }
+/* END Toggle Switch Styles */
 
 /* Drag and Drop styles (Enhanced visual feedback) */
 .dynamic-song-card {
     cursor: grab;
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.dynamic-song-card:not(.dragging):hover {
+.dynamic-song-card:not(.dragging-visual):hover { /* Usar dragging-visual para evitar conflito */
     transform: scale(1.01);
     box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-.dynamic-song-card.dragging {
-    opacity: 0.5;
+.dynamic-song-card.dragging-visual { /* Classe aplicada durante o arrasto */
+    opacity: 0.3;
     cursor: grabbing;
-    border-style: dashed;
-    box-shadow: 0 0 0 4px #29aae2; /* Contorno azul forte ao arrastar */
 }
-.dynamic-song-card.drag-over {
-    border: 2px dashed #29aae2;
-    background-color: #e0f2fe; /* Light blue for drag over */
+.dynamic-song-card.drag-over-top {
+    border-top: 4px solid #29aae2;
 }
-.dark .dynamic-song-card.drag-over {
-    background-color: #0c4a6e; /* Darker blue for drag over */
+.dynamic-song-card.drag-over-bottom {
+    border-bottom: 4px solid #29aae2;
 }
+/* END Drag and Drop styles */
     
 /* Input focus state enhancement */
+/* Usamos :focus-within no Tailwind para inputs complexos, mas este é o CSS global */
 input:focus, select:focus, textarea:focus {
-    --tw-ring-color: #29aae2;
-    border-color: #29aae2;
+    /* Forçando a cor do ring e border a ser o brand-blue */
+    --tw-ring-color: #29aae2 !important; 
+    border-color: #29aae2 !important;
 }

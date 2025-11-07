@@ -195,7 +195,7 @@ export function initializeGeneratorEventListeners() {
 
         // Reset selector UI
         const selectorWrapper = document.getElementById('song-type-selector-wrapper');
-        const customInputWrapper = document.getElementById('custom-song-type-wrapper');
+        const customInputWrapper = document.getElementById('custom-song-type-input-wrapper'); // CORREÇÃO: Usando o ID correto
         selector.value = songFields[0]?.title || '';
         selectorWrapper.classList.remove('hidden');
         customInputWrapper.classList.add('hidden');
@@ -273,40 +273,99 @@ export function initializeGeneratorEventListeners() {
     const songContainer = document.getElementById('dynamic-song-fields-container');
     let draggedItem = null;
 
+    // Adicionando CSS para o Dragging Visual
+    const style = document.createElement('style');
+    style.textContent = `
+        .dynamic-song-card.dragging-visual {
+            opacity: 0.3;
+        }
+        .dynamic-song-card.drag-over-top {
+            border-top: 4px solid var(--brand-blue-color, #29aae2); /* Usa cor da marca */
+        }
+        .dynamic-song-card.drag-over-bottom {
+            border-bottom: 4px solid var(--brand-blue-color, #29aae2); /* Usa cor da marca */
+        }
+    `;
+    document.head.appendChild(style);
+
     if (songContainer) {
+        // --- DRAGSTART (Início do arrasto) ---
         songContainer.addEventListener('dragstart', (e) => {
             if (e.target.classList.contains('dynamic-song-card')) {
                 draggedItem = e.target;
-                setTimeout(() => draggedItem.classList.add('dragging'), 0);
+                // Adiciona classe visual para o item arrastado
+                setTimeout(() => draggedItem.classList.add('dragging-visual'), 0);
+                e.dataTransfer.effectAllowed = 'move';
             }
         });
 
+        // --- DRAGOVER (Item sobre outro) ---
         songContainer.addEventListener('dragover', (e) => {
             e.preventDefault(); 
+            if (!draggedItem) return;
+
             const target = e.target.closest('.dynamic-song-card');
-            if (target && draggedItem && target !== draggedItem) {
+            if (target && target !== draggedItem) {
+                // Limpa classes de feedback de todos os itens
+                Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over-top', 'drag-over-bottom'));
+                
+                // Determina se o arraste está na metade superior ou inferior do alvo
                 const rect = target.getBoundingClientRect();
-                const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
-                songContainer.insertBefore(draggedItem, next && target.nextSibling || target);
-                Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over'));
-                target.classList.add('drag-over');
+                const isNearBottom = (e.clientY - rect.top) / rect.height > 0.5;
+                
+                if (isNearBottom) {
+                    target.classList.add('drag-over-bottom');
+                } else {
+                    target.classList.add('drag-over-top');
+                }
+            }
+        });
+        
+        // --- DRAGENTER (Necessário para dragover funcionar) ---
+        songContainer.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+        });
+
+
+        // --- DROP (Soltar o item) ---
+        songContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!draggedItem) return;
+            
+            const dropTarget = e.target.closest('.dynamic-song-card');
+            
+            // Remove todas as classes de feedback visual
+            Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over-top', 'drag-over-bottom'));
+
+            if (dropTarget && dropTarget !== draggedItem) {
+                // Encontra onde estava o feedback visual
+                const isDroppedBefore = dropTarget.classList.contains('drag-over-top');
+                const isDroppedAfter = dropTarget.classList.contains('drag-over-bottom');
+
+                if (isDroppedBefore) {
+                    songContainer.insertBefore(draggedItem, dropTarget);
+                } else if (isDroppedAfter) {
+                    songContainer.insertBefore(draggedItem, dropTarget.nextSibling);
+                } else {
+                    // Fallback: se não houver classe, insere antes (comportamento padrão)
+                     songContainer.insertBefore(draggedItem, dropTarget);
+                }
+                
+                showGeneratorFeedback('Ordem do cântico atualizada.', false, 2000);
             }
         });
 
+        // --- DRAGLEAVE / DRAGEND (Limpeza) ---
         songContainer.addEventListener('dragleave', (e) => {
             const target = e.target.closest('.dynamic-song-card');
-            if (target) target.classList.remove('drag-over');
-        });
-
-        songContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
-            Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over'));
+            if (target) target.classList.remove('drag-over-top', 'drag-over-bottom');
         });
 
         songContainer.addEventListener('dragend', () => {
-            if (draggedItem) draggedItem.classList.remove('dragging');
+            if (draggedItem) draggedItem.classList.remove('dragging-visual');
             draggedItem = null;
-            Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over'));
+            // Limpa as classes de feedback do container
+            Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over-top', 'drag-over-bottom'));
         });
     }
 }
@@ -543,7 +602,7 @@ function renderSingleRepertoryView(repertoryData) {
                     <i class="fas fa-chevron-down transition-transform text-brand-blue text-lg"></i>
                 </button>
                 <div class="accordion-content">
-                   <div class="p-6 border-t border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-darkcard">
+                   <div class="p-6 border-t border-slate-200 dark:border-slate-600 bg-brand-light-gray dark:bg-darkcard">
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                             <div class="lyrics-container">
                                 <h5 class="font-bold text-brand-blue mb-3 text-center text-md uppercase tracking-wider border-b pb-1">Letra</h5>
