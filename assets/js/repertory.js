@@ -26,15 +26,15 @@ function setGeneratorButtonsLoading(isLoading) {
         if (isLoading) {
             if (icon) icon.className = 'fas fa-spinner fa-spin mr-2';
         } else {
-             if (icon) {
-                 const originalIcons = { 
-                     'generate-pptx-btn': 'fa-file-powerpoint', 
-                     'generate-pdf-btn': 'fa-file-pdf', 
-                     'save-repertory-btn': 'fa-save',
-                     'clear-form-btn': 'fa-undo',
-                     'clear-repertory-history-btn': 'fa-trash-alt'
-                 };
-                 icon.className = `fas ${originalIcons[btnId]} mr-2`;
+            if (icon) {
+                const originalIcons = { 
+                    'generate-pptx-btn': 'fa-file-powerpoint', 
+                    'generate-pdf-btn': 'fa-file-pdf', 
+                    'save-repertory-btn': 'fa-save',
+                    'clear-form-btn': 'fa-undo',
+                    'clear-repertory-history-btn': 'fa-trash-alt'
+                };
+                icon.className = `fas ${originalIcons[btnId]} mr-2`;
             }
         }
     });
@@ -57,6 +57,7 @@ function createSongFieldHTML(title, lyrics = '', link = '') {
     const isAdmin = currentUser && (currentUser.role === 'admin' || isSuperAdmin(currentUser));
 
     // APLICANDO rounded-3xl no card e rounded-2xl nos elementos internos
+    // NOTA: Adicionamos 'draggable="true"' para o D&D de desktop
     return `
     <div class="dynamic-song-card bg-white dark:bg-darkcard p-5 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-xl transition-all duration-300 hover:shadow-2xl hover:ring-2 hover:ring-brand-blue" data-song-title="${title}" draggable="true">
         <div class="flex justify-between items-center mb-4 border-b pb-3 border-slate-100 dark:border-slate-700">
@@ -269,7 +270,7 @@ export function initializeGeneratorEventListeners() {
         }
     });
 
-    // Drag and Drop logic
+    // --- Início da Lógica de Drag and Drop (Desktop + Mobile) ---
     const songContainer = document.getElementById('dynamic-song-fields-container');
     let draggedItem = null;
 
@@ -278,6 +279,8 @@ export function initializeGeneratorEventListeners() {
     style.textContent = `
         .dynamic-song-card.dragging-visual {
             opacity: 0.3;
+            /* Adicionamos 'scale' para um feedback mais óbvio no mobile */
+            transform: scale(0.95); 
         }
         .dynamic-song-card.drag-over-top {
             border-top: 4px solid var(--brand-blue-color, #29aae2); 
@@ -289,85 +292,140 @@ export function initializeGeneratorEventListeners() {
     document.head.appendChild(style);
 
     if (songContainer) {
-        // --- DRAGSTART (Início do arrasto) ---
-        songContainer.addEventListener('dragstart', (e) => {
-            if (e.target.classList.contains('dynamic-song-card')) {
-                draggedItem = e.target;
-                // Adiciona classe visual para o item arrastado
-                setTimeout(() => draggedItem.classList.add('dragging-visual'), 0);
-                e.dataTransfer.effectAllowed = 'move';
-            }
-        });
-
-        // --- DRAGOVER (Item sobre outro) ---
-        songContainer.addEventListener('dragover', (e) => {
-            e.preventDefault(); 
-            if (!draggedItem) return;
-
-            const target = e.target.closest('.dynamic-song-card');
-            if (target && target !== draggedItem) {
-                // Limpa classes de feedback de todos os itens
-                Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over-top', 'drag-over-bottom'));
-                
-                // Determina se o arraste está na metade superior ou inferior do alvo
-                const rect = target.getBoundingClientRect();
-                const isNearBottom = (e.clientY - rect.top) / rect.height > 0.5;
-                
-                if (isNearBottom) {
-                    target.classList.add('drag-over-bottom');
-                } else {
-                    target.classList.add('drag-over-top');
-                }
-            }
-        });
         
-        // --- DRAGENTER (Necessário para dragover funcionar) ---
-        songContainer.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-        });
+        // --- Funções Auxiliares de D&D ---
 
+        // Limpa todos os feedbacks visuais (bordas)
+        const clearDragFeedback = () => {
+            Array.from(songContainer.children).forEach(child => 
+                child.classList.remove('drag-over-top', 'drag-over-bottom')
+            );
+        };
 
-        // --- DROP (Soltar o item) ---
-        songContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
+        // Aplica o feedback visual (borda) com base na posição Y (do mouse ou toque)
+        const handleDragOver = (currentY, targetCard) => {
+            if (!targetCard || targetCard === draggedItem) return;
+
+            clearDragFeedback(); // Limpa feedbacks antigos
+
+            const rect = targetCard.getBoundingClientRect();
+            // Determina se o arraste está na metade superior ou inferior do alvo
+            const isNearBottom = (currentY - rect.top) / rect.height > 0.5;
+            
+            if (isNearBottom) {
+                targetCard.classList.add('drag-over-bottom');
+            } else {
+                targetCard.classList.add('drag-over-top');
+            }
+        };
+
+        // Lógica de "soltar" o item
+        const handleDrop = () => {
             if (!draggedItem) return;
-            
-            const dropTarget = e.target.closest('.dynamic-song-card');
-            
-            // Remove todas as classes de feedback visual
-            Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over-top', 'drag-over-bottom'));
+
+            // Encontra o alvo onde o item deve ser solto
+            const dropTarget = songContainer.querySelector('.drag-over-top, .drag-over-bottom');
 
             if (dropTarget && dropTarget !== draggedItem) {
-                // Encontra onde estava o feedback visual
                 const isDroppedBefore = dropTarget.classList.contains('drag-over-top');
-                const isDroppedAfter = dropTarget.classList.contains('drag-over-bottom');
-
+                
                 if (isDroppedBefore) {
                     songContainer.insertBefore(draggedItem, dropTarget);
-                } else if (isDroppedAfter) {
-                    songContainer.insertBefore(draggedItem, dropTarget.nextSibling);
                 } else {
-                    // Fallback: se não houver classe, insere antes (comportamento padrão)
-                     songContainer.insertBefore(draggedItem, dropTarget);
+                    // insertBefore(item, null) funciona como appendChild se nextSibling for null
+                    songContainer.insertBefore(draggedItem, dropTarget.nextSibling);
                 }
-                
                 showGeneratorFeedback('Ordem do cântico atualizada.', false, 2000);
+            }
+            
+            clearDragFeedback(); // Limpa feedback após o drop
+        };
+
+        // Limpeza final ao terminar ou cancelar o arraste
+        const handleDragEnd = () => {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging-visual');
+            }
+            draggedItem = null;
+            clearDragFeedback();
+        };
+
+        // --- Eventos de MOUSE (Desktop) ---
+
+        songContainer.addEventListener('dragstart', (e) => {
+            // Não inicia o drag se estiver em um input, textarea ou botão
+            if (e.target.closest('.dynamic-song-card') && !e.target.closest('input, textarea, button')) {
+                draggedItem = e.target.closest('.dynamic-song-card');
+                // Usamos setTimeout para dar tempo ao navegador de criar o "fantasma" do drag
+                setTimeout(() => draggedItem.classList.add('dragging-visual'), 0);
+                e.dataTransfer.effectAllowed = 'move';
+            } else {
+                e.preventDefault(); // Impede o drag em inputs
             }
         });
 
-        // --- DRAGLEAVE / DRAGEND (Limpeza) ---
-        songContainer.addEventListener('dragleave', (e) => {
+        songContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessário para permitir o drop
+            if (!draggedItem) return;
             const target = e.target.closest('.dynamic-song-card');
-            if (target) target.classList.remove('drag-over-top', 'drag-over-bottom');
+            handleDragOver(e.clientY, target); // Passa a posição Y do mouse
         });
 
-        songContainer.addEventListener('dragend', () => {
-            if (draggedItem) draggedItem.classList.remove('dragging-visual');
-            draggedItem = null;
-            // Limpa as classes de feedback do container
-            Array.from(songContainer.children).forEach(child => child.classList.remove('drag-over-top', 'drag-over-bottom'));
+        songContainer.addEventListener('dragenter', (e) => e.preventDefault());
+
+        songContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            handleDrop();
+            handleDragEnd(); // Limpa no final
+        });
+
+        songContainer.addEventListener('dragend', handleDragEnd);
+        
+        songContainer.addEventListener('dragleave', (e) => {
+            // Limpa feedback se o mouse sair do card específico (opcional, mas bom)
+            const target = e.target.closest('.dynamic-song-card');
+            if (target) {
+                target.classList.remove('drag-over-top', 'drag-over-bottom');
+            }
+        });
+
+        // --- Eventos de TOQUE (Mobile) ---
+
+        songContainer.addEventListener('touchstart', (e) => {
+            // Apenas inicia o drag se o toque for no card, não nos inputs/textarea/botões
+            if (e.target.closest('.dynamic-song-card') && !e.target.closest('input, textarea, button')) {
+                draggedItem = e.target.closest('.dynamic-song-card');
+                draggedItem.classList.add('dragging-visual');
+            }
+        }, { passive: true }); // passive: true permite o scroll padrão se o drag não for iniciado
+
+        songContainer.addEventListener('touchmove', (e) => {
+            if (!draggedItem) return;
+            
+            // Previne o scroll da página *enquanto* o usuário está arrastando o item
+            e.preventDefault(); 
+
+            const touch = e.touches[0];
+            // Encontra o elemento (card) que está debaixo do dedo do usuário
+            const elementOver = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetCard = elementOver ? elementOver.closest('.dynamic-song-card') : null;
+            
+            handleDragOver(touch.clientY, targetCard); // Passa a posição Y do toque
+        }, { passive: false }); // { passive: false } é CRUCIAL para o e.preventDefault() funcionar no touchmove
+
+        // touchend é o "drop" no mobile
+        songContainer.addEventListener('touchend', (e) => {
+            if (!draggedItem) return;
+            handleDrop();
+            handleDragEnd(); // Limpa tudo
+        });
+
+        // touchcancel ocorre se o sistema interromper o toque (ex: alerta do celular)
+        songContainer.addEventListener('touchcancel', (e) => {
+            handleDragEnd(); // Apenas limpa
         });
     }
+    // --- Fim da Lógica de Drag and Drop ---
 }
 
 // --- Data Persistence and Loading ---
@@ -557,7 +615,7 @@ function loadRepertoryForViewing(repertoryId) {
     let repertoryData;
     
     if (!repertory) {
-         // Fallback to current form data if not found in history (e.g., viewing unsaved work)
+        // Fallback to current form data if not found in history (e.g., viewing unsaved work)
         repertoryData = getSongDataFromForm();
         if (!repertoryData.date && repertoryData.songs.length === 0) return; // Cannot view empty form
     } else {
@@ -609,8 +667,8 @@ function renderSingleRepertoryView(repertoryData) {
                                 <pre class="text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-sans text-base leading-relaxed text-left p-4 rounded-2xl bg-brand-light-gray dark:bg-slate-800 shadow-inner border border-slate-200 dark:border-slate-700">${song.lyrics || 'Letra não disponível.'}</pre>
                             </div>
                             <div class="player-container">
-                                 <h5 class="font-bold text-brand-blue mb-3 text-center text-md uppercase tracking-wider border-b pb-1">Mídia</h5>
-                                 ${embedHtml}
+                                <h5 class="font-bold text-brand-blue mb-3 text-center text-md uppercase tracking-wider border-b pb-1">Mídia</h5>
+                                ${embedHtml}
                             </div>
                         </div>
                    </div>
@@ -693,8 +751,8 @@ async function generatePptx() {
         // Adiciona feedback se não for Admin
         const currentUser = getCurrentUser();
         if (!currentUser || (currentUser.role !== 'admin' && !isSuperAdmin(currentUser))) {
-             showGeneratorFeedback("Você não tem permissão de administrador para gerar arquivos.", true);
-             return;
+            showGeneratorFeedback("Você não tem permissão de administrador para gerar arquivos.", true);
+            return;
         }
 
         if (songsWithLyrics.length === 0) {
@@ -705,8 +763,8 @@ async function generatePptx() {
 
         // Verifica se PptxGenJS está disponível
         if (typeof PptxGenJS === 'undefined') {
-             showGeneratorFeedback('Erro: A biblioteca PptxGenJS não está carregada.', true);
-             return;
+            showGeneratorFeedback('Erro: A biblioteca PptxGenJS não está carregada.', true);
+            return;
         }
 
         let pptx = new PptxGenJS();
@@ -793,8 +851,8 @@ function generatePdf() {
         // Adiciona feedback se não for Admin
         const currentUser = getCurrentUser();
         if (!currentUser || (currentUser.role !== 'admin' && !isSuperAdmin(currentUser))) {
-             showGeneratorFeedback("Você não tem permissão de administrador para gerar arquivos.", true);
-             return;
+            showGeneratorFeedback("Você não tem permissão de administrador para gerar arquivos.", true);
+            return;
         }
 
         if (songsWithLyrics.length === 0) {
@@ -803,10 +861,10 @@ function generatePdf() {
             return;
         }
         
-         // Verifica se jsPDF está disponível
+        // Verifica se jsPDF está disponível
         if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
-             showGeneratorFeedback('Erro: A biblioteca jsPDF não está carregada.', true);
-             return;
+            showGeneratorFeedback('Erro: A biblioteca jsPDF não está carregada.', true);
+            return;
         }
 
         const { jsPDF } = window.jspdf;
@@ -852,10 +910,10 @@ function generatePdf() {
             const requiredSpaceForTitleAndFirstLine = 45; // Approx space for title + gap + first line
             
             if (y + requiredSpaceForTitleAndFirstLine > pageHeight - margin) {
-                 doc.addPage();
-                 y = margin + 20;
+                doc.addPage();
+                y = margin + 20;
             } else {
-                 if(y > margin + 21) y += 30;
+                if(y > margin + 21) y += 30;
             }
 
             doc.setFont('helvetica', 'bold');
