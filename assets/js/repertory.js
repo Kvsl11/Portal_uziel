@@ -60,9 +60,19 @@ function createSongFieldHTML(title, lyrics = '', link = '') {
     // NOTA: Adicionamos 'draggable="true"' para o D&D de desktop
     return `
     <div class="dynamic-song-card bg-white dark:bg-darkcard p-5 rounded-3xl border border-slate-300 dark:border-slate-700 shadow-xl transition-all duration-300 hover:shadow-2xl hover:ring-2 hover:ring-brand-blue" data-song-title="${title}" draggable="true">
-        <div class="flex justify-between items-center mb-4 border-b pb-3 border-slate-100 dark:border-slate-700">
+        <!-- Alterado de 'justify-between' para 'items-center' para acomodar o handle -->
+        <div class="flex items-center mb-4 border-b pb-3 border-slate-100 dark:border-slate-700">
+            
+            <!-- Ícone de Arrastar (Drag Handle) - Visível apenas para Admin -->
+            <span class="drag-handle-icon text-slate-400 dark:text-slate-600 mr-4 cursor-grab admin-only-input-area" title="Arraste para reordenar" ${!isAdmin ? 'style="display:none;"' : ''}>
+                <i class="fas fa-grip-vertical text-xl"></i>
+            </span>
+
+            <!-- Título (com flex-grow) -->
             <input type="text" value="${title}" class="song-title-input text-2xl font-extrabold text-brand-text dark:text-white flex-grow bg-transparent border-0 p-0 focus:outline-none focus:ring-0 placeholder-gray-500 disabled:cursor-auto" ${!isAdmin ? 'disabled' : ''}>
-            <button type="button" class="remove-song-btn text-red-600 hover:text-white bg-red-100 hover:bg-red-700 font-semibold transition-all duration-200 p-2 rounded-2xl shadow-md admin-only-input transform hover:scale-110" title="Remover Cântico" ${!isAdmin ? 'disabled' : ''}>
+            
+            <!-- Botão de Remover (com ml-4 para espaçamento) -->
+            <button type="button" class="remove-song-btn text-red-600 hover:text-white bg-red-100 hover:bg-red-700 font-semibold transition-all duration-200 p-2 rounded-2xl shadow-md admin-only-input transform hover:scale-110 ml-4" title="Remover Cântico" ${!isAdmin ? 'disabled' : ''}>
                 <i class="fas fa-trash-alt"></i>
             </button>
         </div>
