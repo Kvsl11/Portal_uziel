@@ -129,10 +129,10 @@ export function setupGeneratorModalForUser() {
     if (!modal) return;
     
     const montarTabBtn = modal.querySelector('[data-tab="montar"]');
+    const historicoTabBtn = modal.querySelector('[data-tab="historico"]');
     const actions = modal.querySelector('#generator-actions');
     const formInputs = modal.querySelectorAll('.admin-only-input');
     const adminInputAreas = modal.querySelectorAll('.admin-only-input-area');
-    const historicoTabBtn = modal.querySelector('[data-tab="historico"]');
     const clearHistoryBtn = document.getElementById('clear-repertory-history-btn');
 
     if (clearHistoryBtn) {
@@ -151,8 +151,13 @@ export function setupGeneratorModalForUser() {
         actions.classList.add('hidden');
         formInputs.forEach(input => input.disabled = true);
         adminInputAreas.forEach(area => area.classList.add('hidden'));
+        // CORREÇÃO 1: Membros comuns devem ver o Histórico por padrão
         historicoTabBtn.click();
     }
+    
+    // CORREÇÃO 2: Garante que o histórico seja renderizado na abertura do modal, 
+    // pois o listener do Firebase já terá preenchido allRepertories
+    renderRepertoryHistory();
 
     // Initialize privacy toggle listener
     const privacyToggle = document.getElementById('repertory-private-toggle');
@@ -244,6 +249,11 @@ export function initializeGeneratorEventListeners() {
         document.querySelectorAll('.generator-tab-pane').forEach(pane => {
             pane.classList.toggle('hidden', pane.id !== `tab-${tabName}`);
         });
+
+        // CORREÇÃO 3: Garante que o histórico seja renderizado quando a aba Histórico é clicada.
+        if (tabName === 'historico') {
+            renderRepertoryHistory();
+        }
     });
 
     // History interaction logic
@@ -396,9 +406,13 @@ export function renderRepertoryHistory() {
     const isCurrentUserSuperAdmin = isSuperAdmin(currentUser);
     const isAdmin = currentUser.role === 'admin' || isCurrentUserSuperAdmin;
 
+    // CORREÇÃO 4: Lógica de filtro mais robusta para visibilidade (Público vs Privado)
     const filteredRepertories = allRepertories.filter(rep => {
-        if (!rep.isPrivate) return true;
-        return (rep.createdBy === currentUser.username) || isCurrentUserSuperAdmin;
+        // Se isPrivate não estiver definido ou for explicitamente false, é público.
+        if (!rep.isPrivate || rep.isPrivate === false) return true; 
+        
+        // Se for privado, só mostra se o usuário for o criador, Admin ou Super Admin.
+        return (rep.createdBy === currentUser.username) || isAdmin || isCurrentUserSuperAdmin;
     });
 
     if (filteredRepertories.length === 0) {
@@ -458,6 +472,7 @@ function loadRepertoryForEditing(repertoryId) {
 
     const privacyToggle = document.getElementById('repertory-private-toggle');
     const privacyLabel = document.getElementById('repertory-privacy-label');
+    const currentUser = getCurrentUser(); // Obtém o usuário atual novamente
     const isCurrentUserSuperAdmin = isSuperAdmin(currentUser);
     const isCreator = currentUser && repertory.createdBy === currentUser.username;
 
@@ -805,6 +820,7 @@ function generatePdf() {
         setGeneratorButtonsLoading(false);
     }
 }
+
 
 // Helper to generate embed HTML for Spotify or YouTube
 function getEmbedHtml(url) {
