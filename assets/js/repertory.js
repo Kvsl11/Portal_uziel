@@ -3,7 +3,7 @@ import { getCurrentUser, isSuperAdmin } from './auth.js';
 import { showFeedback, openConfirmationModal } from './ui.js';
 
 // Configuração da API Gemini - CHAVE OBRIGATORIAMENTE VAZIA
-const GEMINI_API_KEY = ""; // 🔑 Usando chave vazia para o ambiente Canvas
+const GEMINI_API_KEY = "AIzaSyA9dNxKWFBESy2BZhB__sT5AAr9ZhFqgJU"; // 🔑 Usando chave vazia para o ambiente Canvas
 // *** ATUALIZADO PARA O MODELO PRO (Nome de endpoint correto) ***
 const GEMINI_MODEL = "gemini-2.5-pro"; 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
