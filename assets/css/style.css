@@ -6,39 +6,44 @@
 }
 
 /* Usamos as cores exatas do Tailwind config para o fundo:
-   bg-brand-light-gray (#f8fafc) no modo claro e darkcard (#1a2233) no escuro.
-   A cor fixa aqui é uma aproximação que funciona fora do escopo do Tailwind.
+   bg-brand-light-gray (#f3f4f6 no seu config, mas vou manter o #f8fafc se for o preferido)
+   darkcard (#1e293b no seu config, mas vou manter o #1a2233 se for o preferido)
 */
+/* Aplicando as cores aproximadas do Tailwind conforme as customizações. */
+
+/* Modo Claro */
 ::-webkit-scrollbar-track {
-    background: #f8fafc; /* Cor base clara */
+    background: #f3f4f6; /* brand-light-gray (aprox.) */
     border-radius: 10px;
 }
+/* Modo Escuro (Dark Mode) */
 .dark ::-webkit-scrollbar-track {
-    background: #1a2233; /* darkcard */
+    background: #1e293b; /* darkcard (aprox.) */
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #29aae2; /* Cor principal solicitada (brand-blue) */
+    background: #29aae2; /* brand-blue */
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #1c88bb; /* brand-dark-blue */
+    background: #2397cf; /* brand-dark-blue */
 }
+/* Forçando cores no Dark Mode para o thumb */
 .dark ::-webkit-scrollbar-thumb {
-    background: #29aae2; /* Cor principal solicitada (brand-blue) */
+    background: #29aae2; /* brand-blue */
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-    background: #1c88bb; /* brand-dark-blue */
+    background: #2397cf; /* brand-dark-blue */
 }
 
 /* FIREFOX - Requires less specific styling */
 .overflow-y-auto {
     scrollbar-width: thin;
-    scrollbar-color: #29aae2 #f8fafc; /* thumb color | track color (brand-blue | brand-light-gray) */
+    scrollbar-color: #29aae2 #f3f4f6; /* thumb color | track color (brand-blue | brand-light-gray) */
 }
 .dark .overflow-y-auto {
-    scrollbar-color: #29aae2 #1a2233; /* brand-blue | darkcard */
+    scrollbar-color: #29aae2 #1e293b; /* brand-blue | darkcard */
 }
 /* END SCROLLBAR CUSTOMIZATION */
 
@@ -63,20 +68,20 @@ main { flex-grow: 1; }
     background-color: rgb(255 255 255 / 0.95); /* Leve transparência no modo claro */
 }
 .dark .header-scrolled {
-    background-color: rgb(26 34 51 / 0.95); /* darkcard */
+    background-color: rgb(30 41 59 / 0.95); /* darkcard (#1e293b) */
 }
 .header-scrolled h1 { font-size: 1.5rem; }
 /* END HEADER ENHANCEMENTS */
 
 
 #home {
-    background-image: url('../img/4.jpg'); /* CORRIGIDO: Adicionado /img/ */
+    background-image: url('../img/4.jpg'); 
     background-size: cover;
     background-position: center;
     position: relative;
 }
 #verse {
-    background-image: url('../img/6.png'); /* CORRIGIDO: Adicionado /img/ */
+    background-image: url('../img/6.png');
     background-size: cover;
     background-position: center;
     position: relative;
@@ -91,7 +96,7 @@ main { flex-grow: 1; }
 }
 .portal-card { 
     transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), border 0.2s ease-in-out;
-    border: 1px solid #e5e7eb; /* default subtle border */
+    border: 1px solid #e5e7eb; /* default subtle border (gray-200) */
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
 }
 .dark .portal-card {
@@ -165,7 +170,7 @@ main { flex-grow: 1; }
 body.menu-open #mobile-menu nav a { opacity: 1; transform: translateY(0); }
     
 #main-login-overlay {
-    background-image: url('../img/5.png'); /* CORRIGIDO: Adicionado /img/ */
+    background-image: url('../img/5.png'); 
     background-size: cover;
     background-position: center;
     transition: opacity 0.5s ease-in-out;

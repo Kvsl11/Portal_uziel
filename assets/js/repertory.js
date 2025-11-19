@@ -4,8 +4,8 @@ import { showFeedback, openConfirmationModal } from './ui.js';
 
 // Configuração da API Gemini - CHAVE OBRIGATORIAMENTE VAZIA
 const GEMINI_API_KEY = "AIzaSyA9dNxKWFBESy2BZhB__sT5AAr9ZhFqgJU"; // 🔑 Usando chave vazia para o ambiente Canvas
-// *** ATUALIZADO PARA O MODELO PRO (Nome de endpoint correto) ***
-const GEMINI_MODEL = "gemini-2.5-pro"; 
+// *** ATUALIZADO PARA O MODELO FLASH (Nome de endpoint correto) ***
+const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025"; // Alterado para flash, pois é mais rápido e suficiente para esta tarefa
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 const MAX_RETRIES = 3;
 
@@ -24,7 +24,8 @@ function showGeneratorFeedback(message, isError = true, duration = 4000) {
 }
 
 function setGeneratorButtonsLoading(isLoading) {
-    const buttons = ['generate-pptx-btn', 'generate-pdf-btn', 'save-repertory-btn', 'clear-form-btn', 'clear-repertory-history-btn'];
+    // *** AJUSTE: Incluindo o novo botão de pré-visualização ***
+    const buttons = ['generate-pptx-btn', 'generate-pdf-btn', 'save-repertory-btn', 'clear-form-btn', 'clear-repertory-history-btn', 'preview-form-btn'];
     buttons.forEach(btnId => {
         const button = document.getElementById(btnId);
         if (!button) return;
@@ -34,12 +35,14 @@ function setGeneratorButtonsLoading(isLoading) {
             if (icon) icon.className = 'fas fa-spinner fa-spin mr-2';
         } else {
             if (icon) {
+                // *** AJUSTE: Adicionando ícone para o botão de pré-visualização ***
                 const originalIcons = { 
                     'generate-pptx-btn': 'fa-file-powerpoint', 
                     'generate-pdf-btn': 'fa-file-pdf', 
                     'save-repertory-btn': 'fa-save',
                     'clear-form-btn': 'fa-undo',
-                    'clear-repertory-history-btn': 'fa-trash-alt'
+                    'clear-repertory-history-btn': 'fa-trash-alt',
+                    'preview-form-btn': 'fa-search'
                 };
                 icon.className = `fas ${originalIcons[btnId]} mr-2`;
             }
@@ -59,7 +62,7 @@ function populateSongTypeSelector() {
 
 function createSongFieldHTML(title, lyrics = '', link = '') {
     songFieldCounter++;
-    const uniqueId = `song-${songFieldCounter}`;
+    const uniqueId = `song-${songFieldCounter}`; // Ex: song-1
     const currentUser = getCurrentUser();
     const isAdmin = currentUser && (currentUser.role === 'admin' || isSuperAdmin(currentUser));
 
@@ -85,8 +88,20 @@ function createSongFieldHTML(title, lyrics = '', link = '') {
         <div class="space-y-4">
             <div class="border-l-4 border-brand-blue/50 pl-3">
                 <label for="lyrics-${uniqueId}" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Letra</label>
-                <!-- NOTE: Usamos font-mono para alinhar cifras quando elas estão presentes -->
-                <textarea id="lyrics-${uniqueId}" rows="4" class="lyrics-input admin-only-input mt-1 block w-full rounded-2xl border-slate-300 dark:border-slate-600 bg-brand-light-gray dark:bg-slate-700 text-slate-900 dark:text-white shadow-inner focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition-colors p-3 font-mono" ${!isAdmin ? 'disabled' : ''}>${lyrics}</textarea>
+                <!-- NOVO: Wrapper com position:relative para o overlay de loading -->
+                <div class="lyrics-input-wrapper relative">
+                    <textarea id="lyrics-${uniqueId}" rows="4" class="lyrics-input admin-only-input mt-1 block w-full rounded-2xl border-slate-300 dark:border-slate-600 bg-brand-light-gray dark:bg-slate-700 text-slate-900 dark:text-white shadow-inner focus:ring-2 focus:ring-brand-blue focus:border-brand-blue transition-colors p-3" ${!isAdmin ? 'disabled' : ''}>${lyrics}</textarea>
+                    
+                    <!-- NOVO: Overlay de carregamento usa o uniqueId para facilitar a busca -->
+                    <div id="lyrics-loading-overlay-${uniqueId}" class="lyrics-loading-overlay hidden absolute inset-0 rounded-2xl bg-white/90 dark:bg-slate-800/90 flex items-center justify-center backdrop-blur-sm z-10 p-3">
+                        <div class="text-center">
+                            <i class="fas fa-magic fa-spin fa-2x text-brand-blue mb-2"></i>
+                            <p class="font-extrabold text-brand-blue dark:text-brand-blue-light text-lg">BUSCANDO LETRAS</p>
+                            <p class="text-sm text-slate-700 dark:text-slate-400 mt-1">Análise de cifras e tom em andamento...</p>
+                        </div>
+                    </div>
+
+                </div>
             </div>
             <div class="border-l-4 border-slate-500/50 pl-3">
                 <label for="link-${uniqueId}" class="block text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">Link (YouTube/Spotify)</label>
@@ -105,7 +120,15 @@ function getSongDataFromForm() {
         const title = card.querySelector('.song-title-input').value.trim();
         const lyrics = card.querySelector('.lyrics-input').value.trim();
         const link = card.querySelector('.link-input').value.trim();
-        return { title, lyrics, link };
+        
+        // Extrair dados opcionais da área da IA se existirem
+        const songNameInput = card.querySelector('.song-name-input-gemini');
+        const artistInput = card.querySelector('.artist-input-gemini');
+        
+        const songName = songNameInput ? songNameInput.value.trim() : '';
+        const artist = artistInput ? artistInput.value.trim() : '';
+
+        return { title, lyrics, link, songName, artist };
     });
 
     const dateInput = document.getElementById('mass-date').value;
@@ -256,6 +279,10 @@ export function initializeGeneratorEventListeners() {
     document.getElementById('generate-pdf-btn')?.addEventListener('click', () => generatePdf());
     document.getElementById('clear-form-btn')?.addEventListener('click', () => clearRepertoryForm());
 
+    // *** NOVO: Listener para o botão de pré-visualização do formulário atual ***
+    document.getElementById('preview-form-btn')?.addEventListener('click', () => loadRepertoryForViewing(null));
+
+
     // Tab switching logic
     const tabsContainer = document.getElementById('generator-tabs');
     tabsContainer?.addEventListener('click', (e) => {
@@ -308,8 +335,9 @@ export function initializeGeneratorEventListeners() {
     // --- Início da Lógica de Drag and Drop (Desktop + Mobile) ---
     const songContainer = document.getElementById('dynamic-song-fields-container');
     let draggedItem = null;
+    let scrollInterval = null; // Variável para controlar o auto-scroll
 
-    // Adicionando CSS para o Dragging Visual
+    // Adicionando CSS para o Dragging Visual E para a nova visualização de cifras
     const style = document.createElement('style');
     style.textContent = `
         .dynamic-song-card.dragging-visual {
@@ -324,8 +352,7 @@ export function initializeGeneratorEventListeners() {
             border-bottom: 4px solid var(--brand-blue-color, #29aae2); 
         }
         .lyrics-input {
-             /* Fonte monoespaçada para alinhar cifras */
-            font-family: 'Consolas', 'Courier New', monospace;
+             /* REMOVIDO: font-mono para aceitar texto normal */
         }
         .accordion-content {
             max-height: 0;
@@ -340,36 +367,130 @@ export function initializeGeneratorEventListeners() {
         .accordion-header.active .fa-chevron-down {
             transform: rotate(180deg);
         }
+        /* CORREÇÃO VISUAL 1: Hover no botão de complexidade */
+        .complexity-btn:hover {
+            color: #29aae2 !important; 
+            border-color: #29aae2 !important;
+            background-color: var(--color-hover-bg, #f0f4f8) !important; 
+        }
+        .complexity-btn.selected:hover {
+            color: white !important; 
+            border-color: #29aae2 !important;
+            background-color: #2183a8 !important; 
+        }
+        .dark .complexity-btn:not(.selected):hover {
+            background-color: #3f5573 !important;
+            color: #fff !important;
+        }
+        .complexity-btn:not(.selected) {
+            color: #475569; /* slate-600 */
+        }
+        
+        /* --- NOVO ESTILO PARA VISUALIZADOR DE CIFRAS E LETRAS --- */
+        .lyrics-display-line {
+            display: block;
+            position: relative;
+            margin-bottom: 1.5rem; /* Espaço para a cifra flutuante + quebra de linha */
+            line-height: 1.6;
+            white-space: pre-wrap; /* Mantém a quebra de linha da letra */
+        }
+        .chord-text {
+            position: absolute;
+            top: -1.2rem; /* Posição acima do texto da letra */
+            font-weight: bold;
+            color: #29aae2; /* Cor da marca */
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1;
+        }
+        .lyrics-container-modern {
+            font-family: 'Inter', sans-serif; /* Fonte moderna para o texto da letra */
+            font-size: 1.1rem; /* Texto da letra um pouco maior */
+            color: #333; /* Cor escura */
+            line-height: 1.6;
+            padding-top: 2rem !important; /* CORREÇÃO: Para evitar que a cifra flutuante superior seja cortada */
+            padding-bottom: 2rem !important; /* Padding inferior */
+        }
+        .dark .lyrics-container-modern {
+             color: #e2e8f0;
+        }
+        /* NOVO: Estilo para o acordeão da Busca Inteligente */
+        .ai-content-wrapper {
+             max-height: 0;
+             overflow: hidden;
+             transition: max-height 0.3s ease-out;
+             padding-top: 0;
+        }
+        .ai-tools-header.active .fa-chevron-down {
+            transform: rotate(180deg);
+        }
+
     `;
     document.head.appendChild(style);
 
     if (songContainer) {
         
-        // --- Funções Auxiliares de D&D ---
+        // --- Funções Auxiliares de D&D e Auto-scroll ---
 
         const clearDragFeedback = () => {
             Array.from(songContainer.children).forEach(child => 
                 child.classList.remove('drag-over-top', 'drag-over-bottom')
             );
         };
+        
+        // Função para parar a rolagem automática
+        const stopScroll = () => {
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+        };
+
+        // Função para iniciar a rolagem automática
+        const startScroll = (direction) => {
+            if (scrollInterval) return;
+
+            const scrollSpeed = 10; // Velocidade de rolagem em pixels
+            scrollInterval = setInterval(() => {
+                // Rola o scroll do corpo principal (ou do elemento rolável principal do Canvas)
+                window.scrollBy(0, direction * scrollSpeed);
+            }, 25); 
+        };
 
         const handleDragOver = (currentY, targetCard) => {
-            if (!targetCard || targetCard === draggedItem) return;
+            if (!draggedItem) return;
 
-            clearDragFeedback(); 
-
-            const rect = targetCard.getBoundingClientRect();
-            // 50% threshold
-            const isNearBottom = (currentY - rect.top) / rect.height > 0.5;
+            const viewportHeight = window.innerHeight;
+            const scrollThreshold = viewportHeight * 0.15; // 15% das bordas
             
-            if (isNearBottom) {
-                targetCard.classList.add('drag-over-bottom');
+            // 1. Lógica de Auto-scroll
+            if (currentY < scrollThreshold) {
+                // Topo da tela: rolar para cima (direção negativa)
+                startScroll(-1); 
+            } else if (currentY > viewportHeight - scrollThreshold) {
+                // Base da tela: rolar para baixo (direção positiva)
+                startScroll(1); 
             } else {
-                targetCard.classList.add('drag-over-top');
+                // Meio da tela: parar rolagem
+                stopScroll();
+            }
+
+            // 2. Lógica de Feedback de Posição (drag-over)
+            clearDragFeedback(); 
+            if (targetCard && targetCard !== draggedItem) {
+                const rect = targetCard.getBoundingClientRect();
+                // 50% threshold
+                const isNearBottom = (currentY - rect.top) / rect.height > 0.5;
+                
+                if (isNearBottom) {
+                    targetCard.classList.add('drag-over-bottom');
+                } else {
+                    targetCard.classList.add('drag-over-top');
+                }
             }
         };
 
         const handleDrop = () => {
+            stopScroll(); // Garante que a rolagem pare ao soltar
             if (!draggedItem) return;
 
             const dropTarget = songContainer.querySelector('.drag-over-top, .drag-over-bottom');
@@ -389,6 +510,7 @@ export function initializeGeneratorEventListeners() {
         };
 
         const handleDragEnd = () => {
+            stopScroll(); // Garante que a rolagem pare ao soltar
             if (draggedItem) {
                 draggedItem.classList.remove('dragging-visual');
             }
@@ -417,6 +539,7 @@ export function initializeGeneratorEventListeners() {
             e.preventDefault(); // Necessário para permitir o drop
             if (!draggedItem) return;
             const target = e.target.closest('.dynamic-song-card');
+            // Usando a posição do cursor (clientY) para o auto-scroll
             handleDragOver(e.clientY, target); 
         });
 
@@ -443,11 +566,11 @@ export function initializeGeneratorEventListeners() {
         songContainer.addEventListener('touchstart', (e) => {
             // Inicia o drag apenas se o toque for no drag handle
             if (e.target.closest('.drag-handle-icon')) {
-                 touchStartCard = e.target.closest('.dynamic-song-card');
-                 if (touchStartCard) {
-                     draggedItem = touchStartCard;
-                     draggedItem.classList.add('dragging-visual');
-                 }
+                touchStartCard = e.target.closest('.dynamic-song-card');
+                if (touchStartCard) {
+                    draggedItem = touchStartCard;
+                    draggedItem.classList.add('dragging-visual');
+                }
             }
         }, { passive: true });
 
@@ -460,6 +583,7 @@ export function initializeGeneratorEventListeners() {
             const elementOver = document.elementFromPoint(touch.clientX, touch.clientY);
             const targetCard = elementOver ? elementOver.closest('.dynamic-song-card') : null;
             
+            // Usando a posição do toque (clientY) para o auto-scroll
             handleDragOver(touch.clientY, targetCard); 
         }, { passive: false });
 
@@ -580,6 +704,9 @@ export function renderRepertoryHistory() {
         return (rep.createdBy === currentUser.username) || isCurrentUserSuperAdmin;
     });
 
+    // Ordena por data (mais recente primeiro)
+    filteredRepertories.sort((a, b) => new Date(b.date) - new Date(a.date));
+
     if (filteredRepertories.length === 0) {
         contentDiv.innerHTML = `<div class="text-center text-slate-500 dark:text-slate-400 py-10"><i class="fas fa-history fa-3x mb-3"></i><p>Nenhum repertório salvo encontrado.</p></div>`;
         return;
@@ -609,7 +736,7 @@ export function renderRepertoryHistory() {
             <button data-id="${rep.id}" class="generate-pdf-from-history-btn text-red-600 hover:text-red-800 transition-colors p-2 rounded-full" title="Gerar PDF deste repertório">
                 <i class="fas fa-file-pdf fa-lg"></i>
             </button>
-           <!-- Botão GERAR PPTX (ícone) -->
+            <!-- Botão GERAR PPTX (ícone) -->
             <button data-id="${rep.id}" class="generate-pptx-from-history-btn transition-colors p-2 rounded-full" title="Gerar PPTX deste repertório" style="color:#29aae2;">
                 <i class="fas fa-file-powerpoint fa-lg"></i>
             </button>
@@ -658,7 +785,7 @@ function loadRepertoryForEditing(repertoryId) {
 
     const form = document.getElementById('pptx-form');
     form['mass-date'].value = repertory.date || '';
-    form['mass-theme'].value = repertory.theme || '';
+    form['mass-theme'].value = repertory.theme || ''; // CORREÇÃO: Usar theme aqui
     document.getElementById('repertory-id').value = repertoryId;
     document.getElementById('repertory-created-by').value = repertory.createdBy || '';
 
@@ -691,8 +818,16 @@ function loadRepertoryForViewing(repertoryId) {
     let repertoryData;
     
     if (!repertory) {
+        // Se repertoryId é null, usa os dados do formulário atual (Pré-visualização)
         repertoryData = getSongDataFromForm();
-        if (!repertoryData.date && repertoryData.songs.length === 0) return; // Cannot view empty form
+        // Incluir o ID vazio aqui para que renderSingleRepertoryView saiba que é um rascunho
+        repertoryData.id = null; 
+        
+        // Se for um rascunho sem data e sem músicas, não visualiza
+        if (!repertoryData.date && repertoryData.songs.length === 0) {
+            showGeneratorFeedback("Preencha o formulário antes de pré-visualizar.", true);
+            return;
+        } 
     } else {
         repertoryData = repertory;
     }
@@ -704,14 +839,89 @@ function loadRepertoryForViewing(repertoryId) {
     viewTabBtn.click();
 }
 
+/**
+ * Converte o formato de cifra em linha [C]lyric em HTML estilizado.
+ * Ex: "[C]Eu [G]canto [Am]aleluia" -> <span class="lyrics-display-line">...</span>
+ * A estilização CSS deve fazer a cifra flutuar acima da letra.
+ */
+function parseChordsToHtml(rawLyrics) {
+    if (!rawLyrics) return '';
+
+    // Remove marcadores antigos de negrito e alinhamento
+    let cleanedLyrics = rawLyrics.replace(/\*\*/g, '').trim();
+
+    // Divide em linhas
+    const lines = cleanedLyrics.split('\n');
+    let htmlContent = '';
+
+    const chordRegex = /(\[.*?\])/g;
+
+    lines.forEach(line => {
+        if (!line.trim()) {
+            htmlContent += '<br>'; // Adiciona quebra de linha extra para estrofes vazias
+            return;
+        }
+
+        // Se a linha não tem colchetes, renderiza como linha simples de texto
+        if (!line.includes('[')) {
+            htmlContent += `<span class="lyrics-display-line">${line}</span>`;
+            return;
+        }
+
+        let lineHtml = '';
+        let lastIndex = 0;
+        let match;
+        
+        // Reset the regex index for each line, essential since 'g' is used
+        chordRegex.lastIndex = 0; 
+
+        // Itera sobre todos os matches de [qualquer coisa]
+        while ((match = chordRegex.exec(line)) !== null) {
+            const chordFull = match[1]; // Ex: [D]
+            const chordName = chordFull.substring(1, chordFull.length - 1).trim(); // Ex: D
+            const chordStart = match.index;
+
+            // 1. Adiciona o texto da letra ANTES da cifra
+            const lyricSegment = line.substring(lastIndex, chordStart);
+            if (lyricSegment) {
+                lineHtml += lyricSegment;
+            }
+
+            // 2. Adiciona a cifra flutuante (absolute) E insere espaços vazios (inline) para compensar a largura da cifra.
+            lineHtml += `<span class="chord-text">${chordName}</span>`;
+            
+            // *** APRIMORAMENTO PRINCIPAL: INSERÇÃO DE ESPAÇOS NÃO QUEBRÁVEIS ***
+            // Adiciona espaços não quebráveis (&nbsp;) para compensar visualmente a largura da cifra.
+            // Isso impede que a letra se "cole" e estabiliza o alinhamento.
+            // +1 é para dar uma pequena margem após o chord.
+            const chordSpacerLength = chordName.length + 1; 
+            lineHtml += Array(chordSpacerLength).fill('&nbsp;').join('');
+
+
+            // Avança o índice após o colchete de fechamento (para ignorar o colchete na letra)
+            lastIndex = chordStart + chordFull.length;
+        }
+
+        // 3. Adiciona o restante da linha da letra
+        const remainingLyric = line.substring(lastIndex);
+        if (remainingLyric) {
+            lineHtml += remainingLyric;
+        }
+        
+        // Envolve a linha completa no contêiner moderno de linha
+        htmlContent += `<span class="lyrics-display-line">${lineHtml}</span>`;
+    });
+
+    return htmlContent;
+}
+
 function renderSingleRepertoryView(repertoryData) {
     const contentDiv = document.getElementById('repertory-viewer-content');
     if (!contentDiv) return;
 
-    const { songs, theme, date, createdBy } = repertoryData;
+    const { id, songs, theme, date, createdBy } = repertoryData;
     const songsWithContent = songs ? songs.filter(s => s.lyrics || s.link) : [];
     
-    // CORREÇÃO: Usar o nome do criador do repertório, ou o usuário atual se for um repertório novo
     const currentUser = getCurrentUser();
     const creatorUsername = createdBy || (currentUser ? currentUser.username : '');
     const creatorName = creatorUsername ? creatorUsername.split('@')[0].toUpperCase() : 'Desconhecido';
@@ -723,7 +933,25 @@ function renderSingleRepertoryView(repertoryData) {
 
     const formattedDate = date ? new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric'}) : '';
 
+    // *** INÍCIO DA ADIÇÃO DE BOTÕES DE AÇÃO NA VISUALIZAÇÃO ***
+    const isSaved = !!id;
+    const canInteract = currentUser && (currentUser.role === 'admin' || isSuperAdmin(currentUser));
+
+    let actionButtons = '';
+    if (canInteract) {
+        if (isSaved) {
+            // Se salvo, mostra o botão Editar (volta para a aba Montar)
+            actionButtons += `<button id="edit-view-btn" data-id="${id}" class="inline-flex items-center gap-2 bg-brand-blue hover:bg-brand-blue/90 text-white font-semibold py-2 px-4 rounded-xl shadow-lg transition-colors transform hover:scale-[1.01] text-sm"><i class="fas fa-edit"></i> Editar Repertório</button>`;
+        } else {
+            // Se não salvo (preview), mostra o botão Salvar
+            actionButtons += `<button id="save-view-btn" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-xl shadow-lg transition-colors transform hover:scale-[1.01] text-sm"><i class="fas fa-save"></i> Salvar Roteiro</button>`;
+        }
+    }
+    // *** FIM DA ADIÇÃO DE BOTÕES DE AÇÃO NA VISUALIZAÇÃO ***
+
+
     let html = `<div class="text-center mb-6">
+                            ${actionButtons ? `<div class="flex justify-center mb-6 gap-3">${actionButtons}</div>` : ''}
                             <h3 class="text-3xl font-bold text-brand-text dark:text-white">Roteiro de Cânticos</h3>
                             <p class="text-brand-blue font-semibold text-xl">${theme || formattedDate}</p>
                             <p class="text-sm italic text-slate-500 dark:text-slate-400 mt-1">Criado por: ${creatorName}</p>
@@ -734,6 +962,9 @@ function renderSingleRepertoryView(repertoryData) {
         const embedHtml = getEmbedHtml(song.link);
         const lyricContent = song.lyrics || 'Letra não disponível.';
         
+        // NOVO: Renderiza a letra usando o parser moderno
+        const modernLyricsHtml = parseChordsToHtml(lyricContent);
+
         html += `
             <div class="accordion-item bg-white dark:bg-darkcard rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-xl hover:shadow-2xl transition-shadow">
                 <button id="header-${index}" class="accordion-header w-full flex justify-between items-center text-left p-5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors focus:outline-none border-l-4 border-brand-blue">
@@ -745,7 +976,10 @@ function renderSingleRepertoryView(repertoryData) {
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                             <div class="lyrics-container">
                                 <h5 class="font-bold text-brand-blue mb-3 text-center text-md uppercase tracking-wider border-b pb-1"><i class="fas fa-file-alt mr-1"></i> Letra e Cifras</h5>
-                                <pre class="text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono text-base leading-relaxed text-left p-4 rounded-2xl bg-white dark:bg-slate-800 shadow-inner border border-slate-200 dark:border-slate-700">${lyricContent}</pre>
+                                <!-- SUBSTITUÍDO: O bloco PRE tag foi substituído por um DIV moderno -->
+                                <div class="lyrics-container-modern p-4 rounded-2xl bg-white dark:bg-slate-800 shadow-inner border border-slate-200 dark:border-slate-700 overflow-x-auto">
+                                    ${modernLyricsHtml}
+                                </div>
                             </div>
                             <div class="player-container">
                                 <h5 class="font-bold text-brand-blue mb-3 text-center text-md uppercase tracking-wider border-b pb-1"><i class="fas fa-headphones-alt mr-1"></i> Mídia (Player)</h5>
@@ -787,6 +1021,22 @@ function renderSingleRepertoryView(repertoryData) {
             }
         });
     });
+
+    // *** NOVO: Listeners para os botões de Ação na Visualização ***
+    const editViewBtn = contentDiv.querySelector('#edit-view-btn');
+    if (editViewBtn) {
+        editViewBtn.addEventListener('click', () => {
+            loadRepertoryForEditing(editViewBtn.dataset.id);
+        });
+    }
+
+    const saveViewBtn = contentDiv.querySelector('#save-view-btn');
+    if (saveViewBtn) {
+        saveViewBtn.addEventListener('click', () => {
+            // Chama a função saveRepertory que pega os dados do formulário
+            saveRepertory(); 
+        });
+    }
 }
 
 async function deleteRepertory(repertoryId) {
@@ -818,6 +1068,48 @@ async function deleteRepertory(repertoryId) {
 }
 
 // --- File Generation Logic ---
+
+/**
+ * Utilitário para limpar marcadores [C] e extrair partes para impressão
+ */
+function extractAndCleanLyrics(rawLyrics) {
+    if (!rawLyrics) return { cleanText: '', parts: [] };
+    
+    // Remove os marcadores de cifra (incluindo o espaço de alinhamento gerado pelo parser)
+    const cleanText = rawLyrics.replace(/\[.*?\]/g, '').replace(/\*\*/g, '').trim();
+    
+    // Separa as partes de letra/estrofe (linhas vazias)
+    const parts = cleanText.split('\n').filter(p => p.trim() !== '');
+
+    return { cleanText, parts };
+}
+
+/**
+ * Utilitário para extrair cifras de uma linha formatada [C]Lyric para o PDF.
+ * Retorna uma lista de { chord: string, offset: number }
+ */
+function extractChordsWithOffsets(line) {
+    const chordRegex = /(\[.*?\])/g;
+    let match;
+    const chords = [];
+    let currentLine = line;
+
+    while ((match = chordRegex.exec(currentLine)) !== null) {
+        const chordFull = match[1]; // Ex: [D]
+        const chordName = chordFull.substring(1, chordFull.length - 1).trim(); // Ex: D
+
+        // O offset é a posição do início da cifra na string *sem* os colchetes anteriores
+        // (Isso é crucial para o alinhamento com a string de letra limpa)
+        const chordPosition = match.index - (currentLine.substring(0, match.index).match(/\[.*?\]/g) || []).join('').length;
+        
+        // Adiciona a cifra e sua posição (offset)
+        chords.push({ chord: chordName, offset: chordPosition });
+        
+        // A linha original deve ser mantida para calcular o offset.
+    }
+    return chords;
+}
+
 
 // *** NOVO: Aceita repertoryData opcional ***
 async function generatePptx(repertoryData = null) {
@@ -863,7 +1155,7 @@ async function generatePptx(repertoryData = null) {
             title: 'SONG_MASTER',
             background: { color: '000000' },
             objects: [
-                { 'text': { text: `Ministério Uziel (Criado por: ${creatorName})`, options: { x: 0.5, y: 8.2, w: '90%', fontFace: 'Poppins', fontSize: 14, color: 'FFFFFF', align: 'left', opacity: 0.7 } } },
+                { 'text': { text: `Ministério Uziel`, options: { x: 0.5, y: 8.2, w: '90%', fontFace: 'Poppins', fontSize: 14, color: 'FFFFFF', align: 'left', opacity: 0.7 } } },
                 { 'text': { text: formattedDate, options: { x: 0.5, y: 8.2, w: '90%', fontFace: 'Poppins', fontSize: 14, color: 'FFFFFF', align: 'right', opacity: 0.7 } } },
             ],
         });
@@ -874,33 +1166,11 @@ async function generatePptx(repertoryData = null) {
             titleSlide.addText(theme, { y: '55%', w: '100%', h: 1, align: 'center', fontFace: 'Poppins', fontSize: 32, color: '29aae2' });
         }
 
-        // *** CORREÇÃO DE LAYOUT: MUDANÇA DE 3 PARA 2 SEGMENTOS ***
-        const segmentsPerSlide = 2; // Mantido em 2
+        const segmentsPerSlide = 2; 
 
         songsWithLyrics.forEach(song => {
-            // Lógica para separar cifras (envolvidas em **) da letra
-            const lines = song.lyrics.split('\n');
-            const songSegments = [];
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (line === '') continue; // Ignora linhas vazias
-
-                // *** CORREÇÃO DE LÓGICA DE CIFRA/LETRA ***
-                // A linha é cifra SE: ela bate o regex de **...** E a próxima linha existe E a próxima linha NÃO é vazia
-                const chordMatch = line.match(/^\*\*(.*)\*\*$/); 
-
-                if (chordMatch && i + 1 < lines.length && lines[i+1].trim() !== '') {
-                    // É um par Cifra/Letra
-                    const chordLine = chordMatch[1].trim(); // Pega o conteúdo DENTRO dos **
-                    const lyricLine = lines[i+1].trim();
-                    songSegments.push({ chords: chordLine, lyrics: lyricLine.replace(/\*\*/g, '') }); // Remove ** da letra
-                    i++; // Pula a próxima linha que foi usada como letra
-                } else {
-                    // É uma linha de letra (remove qualquer negrito que o usuário tenha colocado)
-                    songSegments.push({ chords: null, lyrics: line.replace(/\*\*/g, '') });
-                }
-            }
+            // *** NOVO: Usa a função de limpeza para PPTX ***
+            const { parts: songSegments } = extractAndCleanLyrics(song.lyrics); 
             
             // Lógica de paginação em slides
             for (let i = 0; i < songSegments.length; i += segmentsPerSlide) {
@@ -922,47 +1192,24 @@ async function generatePptx(repertoryData = null) {
                     fontFace: 'Poppins', fontSize: 28, color: '29aae2', bold: true 
                 });
                 
-                // *** CORREÇÃO: Lógica de Posição Y e Altura do PPTX ***
                 
-                let currentY = 1.5; // Posição Y inicial para o primeiro segmento
-                
-                // *** AJUSTE DE TAMANHO/ESPAÇAMENTO PARA EVITAR TRANSBORDAMENTO ***
-                const chordFontSize = 16; // Reduzido de 18
-                const lyricFontSize = 26; // Reduzido de 28
-                const segmentSpacing = 3.0; // Reduzido de 3.3 (Espaço total para um Cifra+Letra)
-                const chordBoxHeight = 0.4; // Reduzido de 0.5
+                let currentY = 1.5; 
+                const segmentSpacing = 3.5; 
 
-                chunk.forEach(segment => {
-                    if (segment.chords) {
-                        // Adiciona Cifra
-                        slide.addText(segment.chords.toUpperCase(), { 
-                            x: 0.5, y: currentY, w: '90%', h: chordBoxHeight, // Aplicado
-                            fontFace: 'Poppins', fontSize: chordFontSize, // Aplicado
-                            color: '29aae2', 
-                            align: 'center',
-                            valign: 'top', 
-                            bold: true,
-                        });
-                    }
-                    
-                    if (segment.lyrics) {
-                         // Adiciona Letra
-                         const lyricY = segment.chords ? (currentY + chordBoxHeight) : currentY;
-                         const effectiveLyricHeight = segment.chords ? (segmentSpacing - chordBoxHeight) : segmentSpacing; // Agora é 2.6 ou 3.0
-
-                        slide.addText(segment.lyrics, { 
-                            x: 0.5, y: lyricY, w: '90%', h: effectiveLyricHeight, // Aplicado
-                            fontFace: 'Poppins', fontSize: lyricFontSize, // Aplicado
+                chunk.forEach(lyricsSegment => {
+                    // O lyricsSegment já está limpo de cifras
+                    if (lyricsSegment) {
+                        slide.addText(lyricsSegment, { 
+                            x: 0.5, y: currentY, w: '90%', h: 3.0, 
+                            fontFace: 'Poppins', fontSize: 30, 
                             color: 'FFFFFF', 
                             align: 'center',
                             valign: 'top', 
                             bold: true,
-                            fit: true // ESSENCIAL: Encolhe o texto para caber na altura
+                            fit: true 
                         });
                     }
-                    
-                    // Avance Y para o PRÓXIMO segmento
-                    currentY += segmentSpacing; // Aplicado
+                    currentY += segmentSpacing; 
                 });
             }
         });
@@ -1021,12 +1268,20 @@ function generatePdf(repertoryData = null) {
         const formattedDate = date ? new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric'}) : '';
         const brandBlue = '#29aae2'; // Cor azul padrão
 
+        // Constantes para formatação de texto
+        const FONT_SIZE_LYRIC = 12;
+        const FONT_SIZE_CHORD = 10;
+        const LINE_HEIGHT_LYRIC = 15;
+        const LINE_HEIGHT_CHORD = 12;
+        const TEXT_WIDTH = pageWidth - (margin * 2);
+
+        // REMOVIDO: Variáveis de largura de caractere estimadas, pois usaremos getTextWidth real
+        
         // *** CORREÇÃO "CRIADO POR" (Garantir que os dados sejam lidos do form/histórico) ***
         const creatorUsername = createdBy || (currentUser ? currentUser.username : '');
         const creatorName = creatorUsername ? creatorUsername.split('@')[0].toUpperCase() : 'Desconhecido';
 
         // Lógica para Header/Footer
-        // *** CORREÇÃO: A função agora RECEBE o nome do criador e a data como parâmetros, garantindo que usem o valor correto do repertório. ***
         const addHeaderFooter = (docInstance, creator, dateText) => {
             const pageCount = docInstance.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
@@ -1072,72 +1327,129 @@ function generatePdf(repertoryData = null) {
                 if(y > margin + 21) y += 30; 
             }
 
-            // Título do Cântico
+            // Título do Card (Entrada, Ofertório, etc)
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
             doc.setTextColor(brandBlue);
             doc.text(song.title.toUpperCase(), pageWidth / 2, y, { align: 'center' });
-            y += 25;
+            y += 20;
+
+            // Exibe Nome da Música e Artista se existirem
+            if (song.songName || song.artist) {
+                 doc.setFont('helvetica', 'italic');
+                 doc.setFontSize(10);
+                 doc.setTextColor('#64748b'); // Cinza
+                 let metaText = song.songName || '';
+                 if (song.artist) metaText += (metaText ? ` - ${song.artist}` : song.artist);
+                 doc.text(metaText, pageWidth / 2, y, { align: 'center' });
+                 y += 20;
+            } else {
+                y += 5; // Espaço extra se não tiver metadados
+            }
 
             // Letra/Cifra
             const lines = song.lyrics.split('\n');
             
             for (let i = 0; i < lines.length; i++) {
-                const trimmedLine = lines[i].trim();
+                const rawLine = lines[i];
+                const trimmedLine = rawLine.trim();
+                
                 if (trimmedLine === '') {
-                    y += 15; // Adiciona espaço extra para quebra de estrofe
+                    y += LINE_HEIGHT_LYRIC; // Adiciona espaço extra para quebra de estrofe
                     continue;
                 }
+
+                // 1. EXTRAI AS CIFRAS COM OS OFFSETS DA LINHA BRUTA
+                const chords = extractChordsWithOffsets(rawLine);
                 
-                // Limpa a linha de * (para ter o conteúdo) - O TEXTO FINAL DA LINHA
-                const lineContentWithoutBoldMarkers = trimmedLine.replace(/\*\*/g, '').trim();
+                // 2. EXTRAI A LETRA LIMPA (removendo [C]markers)
+                const cleanLyricLine = rawLine.replace(/\[.*?\]/g, '').replace(/\*\*/g, '');
 
-                // Verifica se a linha original (trimmedLine) é SÓ cifras (marcada com **)
-                const chordMatch = trimmedLine.match(/^\*\*(.*)\*\*$/); 
+                // 3. DIVIDE A LINHA DA LETRA DE ACORDO COM A LARGURA DO PDF
+                doc.setFont('helvetica', 'normal'); 
+                doc.setFontSize(FONT_SIZE_LYRIC);
+                const splitLyrics = doc.splitTextToSize(cleanLyricLine, TEXT_WIDTH);
+                
+                let currentLyricOffset = 0;
 
-                // *** CORREÇÃO DE LÓGICA DE CIFRA/LETRA ***
-                // É um par Cifra/Letra se: a linha atual é cifra (chordMatch) E a próxima linha existe E a próxima linha NÃO é vazia
-                if (chordMatch && i + 1 < lines.length && lines[i+1].trim() !== '') {
-                    const chordLine = lineContentWithoutBoldMarkers; // Pega a cifra LIMPA
+                // 4. Itera sobre as linhas de letra (quebradas)
+                for(let lineIndex = 0; lineIndex < splitLyrics.length; lineIndex++) {
+                    const lyricChunk = splitLyrics[lineIndex];
+
+                    // Verifica quebra de página
+                    if (y > pageHeight - margin - LINE_HEIGHT_CHORD - LINE_HEIGHT_LYRIC) { 
+                        doc.addPage(); 
+                        y = margin + 20; 
+                    }
                     
-                    // Se for cifra, usa uma cor/estilo diferente e um espaço menor
-                    doc.setFont('helvetica', 'bold'); // Em negrito (como solicitado)
-                    doc.setFontSize(10);
-                    doc.setTextColor(brandBlue); // Cor azul (como solicitado)
-                    
-                    const splitChords = doc.splitTextToSize(chordLine, pageWidth - (margin * 2)); 
-                    
-                    splitChords.forEach(chordChunk => {
-                         if (y > pageHeight - margin) { doc.addPage(); y = margin + 20; }
-                         doc.text(chordChunk, pageWidth / 2, y, { align: 'center' });
-                         y += 12; // Espaço menor para cifra
+                    // --- 1. CÁLCULO DA POSIÇÃO INICIAL CENTRALIZADA (USA FONTE DA LETRA) ---
+                    // IMPORTANTE: Definir a fonte da letra para que getTextWidth calcule corretamente
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(FONT_SIZE_LYRIC);
+                    // startX é o ponto de início (x mais à esquerda) do bloco de texto centralizado
+                    const startX = (pageWidth / 2) - (doc.getTextWidth(lyricChunk) / 2); 
+
+                    let chordsForThisLine = false;
+
+                    // Lista de cifras já impressas no chunk atual, para espaçamento
+                    let lastChordXEnd = 0;
+
+                    chords.forEach(chord => {
+                        // Verifica se a cifra está dentro do segmento de letra atual
+                        if (chord.offset >= currentLyricOffset && chord.offset < currentLyricOffset + lyricChunk.length) {
+                            
+                            const offsetInChunk = chord.offset - currentLyricOffset;
+                            
+                            // Texto que PRECEDE a cifra no chunk atual
+                            doc.setFont('helvetica', 'normal');
+                            doc.setFontSize(FONT_SIZE_LYRIC);
+                            const precedingText = lyricChunk.substring(0, offsetInChunk);
+
+                            // A. MEDIR A LARGURA DO TEXTO PRECEDENTE (usa fonte da letra)
+                            const widthOfPrecedingText = doc.getTextWidth(precedingText); 
+
+                            // B. CALCULAR POSIÇÃO X: Início do bloco centralizado + largura do texto precedente
+                            let chordX = startX + widthOfPrecedingText;
+                            
+                            // *** AJUSTE PRINCIPAL FINAL: Garantir espaçamento e resolver sobreposição ***
+                            const MIN_CHORD_SEPARATION = 4; // Mínimo de 4pt de espaço entre o fim da cifra anterior e o início da atual
+
+                            if (lastChordXEnd > 0 && chordX < lastChordXEnd + MIN_CHORD_SEPARATION) {
+                                // Se a nova cifra começar antes do fim da anterior (mais a margem de segurança), ajuste a posição
+                                chordX = lastChordXEnd + MIN_CHORD_SEPARATION; 
+                            }
+                            
+                            // C. IMPRIMIR A CIFRA (usa fonte da cifra)
+                            doc.setFont('courier', 'bold'); // Fonte monoespaçada para manter o alinhamento
+                            doc.setFontSize(FONT_SIZE_CHORD);
+                            doc.setTextColor(brandBlue);
+                            
+                            // Ajusta Y para a linha da cifra
+                            doc.text(chord.chord, chordX, y);
+                            chordsForThisLine = true;
+
+                            // Atualiza o ponto final da cifra atual
+                            // Garantir que a medição use a fonte da cifra
+                            doc.setFont('courier', 'bold'); // Reassegura a fonte para getTextWidth
+                            doc.setFontSize(FONT_SIZE_CHORD);
+                            lastChordXEnd = chordX + doc.getTextWidth(chord.chord);
+                        }
                     });
                     
-                    // Reseta para letra
-                    doc.setFont('helvetica', 'normal'); 
-                    doc.setFontSize(12);
-                    doc.setTextColor('#334155');
+                    // Se imprimiu cifras, avança o Y para a letra
+                    if (chordsForThisLine) {
+                         y += LINE_HEIGHT_CHORD;
+                    }
 
-                    // Pula a próxima linha (letra) e a processa imediatamente
-                    i++;
-                    const lyricLine = lines[i].trim().replace(/\*\*/g, ''); // Pega a letra e limpa negrito
-                     const splitLyrics = doc.splitTextToSize(lyricLine, pageWidth - (margin * 2));
-                    
-                    splitLyrics.forEach(lyricChunk => {
-                        if (y > pageHeight - margin) { doc.addPage(); y = margin + 20; }
-                        doc.text(lyricChunk, pageWidth / 2, y, { align: 'center' });
-                        y += 15; // Espaço normal para letra
-                    });
+                    // --- IMPRIME A LETRA ---
+                    doc.setFont('helvetica', 'normal'); // Reassegura a fonte da letra
+                    doc.setFontSize(FONT_SIZE_LYRIC);
+                    doc.setTextColor(0, 0, 0); // Preto
+                    doc.text(lyricChunk, pageWidth / 2, y, { align: 'center' });
+                    y += LINE_HEIGHT_LYRIC;
 
-                } else {
-                    // É uma linha de letra (ou cifra órfã) - trata como letra
-                    const splitLyrics = doc.splitTextToSize(lineContentWithoutBoldMarkers, pageWidth - (margin * 2));
-                    
-                    splitLyrics.forEach(lyricChunk => {
-                        if (y > pageHeight - margin) { doc.addPage(); y = margin + 20; }
-                        doc.text(lyricChunk, pageWidth / 2, y, { align: 'center' });
-                        y += 15; // Espaço normal para letra
-                    });
+                    // Atualiza o offset para a próxima iteração
+                    currentLyricOffset += lyricChunk.length;
                 }
             }
         });
@@ -1203,32 +1515,36 @@ function getEmbedHtml(url) {
 // ===================== INTEGRAÇÃO GEMINI (IA DO GOOGLE) =====================
 
 /**
- * Constrói a query de busca final a ser enviada para o Gemini.
+ * Constrói a query de busca final a ser enviada para o Gemini, de forma robusta.
  */
-function buildSearchQuery(cardTitle, customPrompt) {
+function buildSearchQuery(explicitSongName, cardTitle, artist, songKey, customPrompt) {
     const genericTitles = songFields.map(f => f.title.toLowerCase());
-    const cleanTitle = cardTitle.trim();
-    const cleanPrompt = customPrompt.trim();
-
-    const isGeneric = genericTitles.some(t => t === cleanTitle.toLowerCase());
     
-    let baseQuery;
+    // Preferência para o nome explícito digitado na caixa da IA, senão usa o título do card
+    let baseQuery = explicitSongName ? explicitSongName.trim() : cardTitle.trim();
 
-    if (isGeneric && cleanPrompt) {
-        // Se o título é genérico ('Entrada'), use o prompt como a base da query.
-        baseQuery = cleanPrompt;
-    } else if (cleanTitle) {
-        // Se o título é específico, use o título e o prompt como modificador.
-        baseQuery = `${cleanTitle} ${cleanPrompt}`.trim();
-    } else if (cleanPrompt) {
-        // Somente prompt disponível.
-        baseQuery = cleanPrompt;
-    } else {
-        return '';
+    const isGeneric = genericTitles.some(t => t === baseQuery.toLowerCase());
+
+    if (isGeneric && customPrompt) {
+        baseQuery = customPrompt;
+        customPrompt = ''; 
+    } 
+    else if (!baseQuery && customPrompt) {
+        baseQuery = customPrompt;
+        customPrompt = '';
     }
 
-    return baseQuery;
+    if (!baseQuery) return '';
+
+    const queryParts = [baseQuery];
+
+    if (artist) queryParts.push(`by ${artist}`);
+    if (songKey && !customPrompt) queryParts.push(`in the key of ${songKey}`); 
+    if (customPrompt) queryParts.push(`(${customPrompt})`);
+
+    return queryParts.join(' ').trim();
 }
+
 
 // NOVO: Função para renderizar botões de busca manual
 function renderMediaSearchButtons(searchQuery, card) {
@@ -1239,46 +1555,61 @@ function renderMediaSearchButtons(searchQuery, card) {
     if (!aiToolsContainer) return;
 
     const widget = document.createElement('div');
-    widget.className = "media-selection-widget mt-4 p-4 rounded-2xl bg-white dark:bg-slate-800 border border-brand-blue/50 shadow-inner text-center";
+    // CORREÇÃO VISUAL 2: Estilização mais moderna para o widget
+    widget.className = "media-selection-widget mt-4 p-4 rounded-2xl bg-white dark:bg-slate-800 border border-brand-blue/50 shadow-inner text-center transform transition-all duration-300 hover:border-brand-blue";
     
     // Codifica a query para ser usada em URLs de busca
     const encodedQuery = encodeURIComponent(searchQuery);
 
     widget.innerHTML = `
-        <h6 class="text-sm font-bold text-brand-text dark:text-white mb-4">
-            <i class="fas fa-search-plus mr-2"></i> Mídia: Busque Manualmente
+        <h6 class="text-sm font-extrabold text-brand-blue dark:text-brand-blue-light mb-4 flex items-center justify-center">
+            <i class="fas fa-search-plus mr-2 text-xl"></i> Mídia: Busque Manualmente
         </h6>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">A IA não sugeriu links, ou você precisa de outro. Clique para buscar. Depois, **cole o link no campo "Link"**.</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">A IA não sugeriu links, ou você precisa de outro. Clique para buscar. Depois, **cole o link no campo "Link"**.</p>
         
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
             <a href="https://open.spotify.com/search/${encodedQuery}" target="_blank" rel="noopener noreferrer" 
-               class="flex items-center justify-center p-3 rounded-2xl bg-green-600 text-white font-extrabold shadow-md hover:bg-green-700 transition-colors transform hover:scale-[1.01]">
-                <i class="fab fa-spotify mr-2"></i> Buscar no Spotify
+                class="flex items-center justify-center p-3 rounded-2xl bg-green-600 text-white font-extrabold shadow-md hover:bg-green-700 transition-colors transform hover:scale-[1.01] text-sm">
+                <i class="fab fa-spotify mr-2"></i> Spotify
             </a>
             <a href="https://www.youtube.com/results?search_query=${encodedQuery}" target="_blank" rel="noopener noreferrer" 
-               class="flex items-center justify-center p-3 rounded-2xl bg-red-600 text-white font-extrabold shadow-md hover:bg-red-700 transition-colors transform hover:scale-[1.01]">
-                <i class="fab fa-youtube mr-2"></i> Buscar no YouTube
+                class="flex items-center justify-center p-3 rounded-2xl bg-red-600 text-white font-extrabold shadow-md hover:bg-red-700 transition-colors transform hover:scale-[1.01] text-sm">
+                <i class="fab fa-youtube mr-2"></i> YouTube
             </a>
         </div>
     `;
 
+    // Anexa o widget APÓS o contêiner de ferramentas (que agora é o acordeão)
     aiToolsContainer.insertAdjacentElement('afterend', widget);
 }
 
 
 // Função para buscar letra (agora com negrito)
-async function fetchSongWithGemini(searchQuery, includeChords = false) {
+async function fetchSongWithGemini(searchQuery, includeChords = false, chordComplexity = 'simple', songKey = '') {
     
-    // *** CORREÇÃO: Removemos a restrição a cânticos católicos. O assistente é agora UNIVERSAL. ***
-    const systemInstruction = `Você é um assistente de música universal, conciso e objetivo. Sua única função é fornecer a letra formatada para a música solicitada. 
-NUNCA inclua links, introduções, saudações, despedidas, resumos, ou qualquer texto além da letra formatada.
-O formato da letra DEVE ser: a cifra na linha de cima, imediatamente seguida pela linha da letra, com as cifras alinhadas horizontalmente à sílaba ou palavra correspondente.
-As linhas de cifras DEVEM SER ENVOLVIDAS em marcadores de negrito Markdown (**) do início ao fim da linha, para que a aplicação possa diferenciá-las da letra. Ex: **Cifra 1 Cifra 2**.`;
+    // *** CORREÇÃO IA: System Instruction mais genérica para não forçar cifra ***
+    const systemInstruction = `Você é um assistente de música, conciso e objetivo. Sua única função é fornecer a letra de música formatada.
+NUNCA inclua links, introduções, saudações, despedidas, resumos, ou qualquer texto além da letra. Mantenha o formato da letra fiel à sua estrutura (estrofes, refrões).`;
 
-    const chordRequest = includeChords ? 'com cifras, formatadas na linha de cima, separadas da letra por uma quebra de linha, e as cifras ENVOLVIDAS em negrito markdown (**cifra**)' : 'sem cifras';
+    let chordInstruction = 'não inclua cifras';
+    if (includeChords) {
+        let complexityDetail = (chordComplexity === 'simple')
+            ? 'SIMPLES (evite extensões complexas, priorize maiores, menores e com sétima)'
+            : 'COMPLETAS (harmonia original rica)';
+        
+        // A instrução de formato [CIFRA] agora está na instrução do prompt, e é incluída APENAS se includeChords for true
+        chordInstruction = `INCLUA cifras ${complexityDetail} EMBUTIDAS NA LINHA DA LETRA, usando colchetes [CIFRA] imediatamente antes da palavra ou sílaba (Ex: [C]Ó meu [G]Senhor).`;
+    }
+
+    // *** AJUSTE PRINCIPAL: Incluir instrução para buscar o tom original se songKey estiver vazio ***
+    let keyInstruction = '';
+    if (includeChords) {
+        keyInstruction = songKey ? ` NO TOM/KEY ESPECIFICADO: ${songKey.toUpperCase()}` : ` NO TOM ORIGINAL DA MÚSICA`;
+    }
+
 
     // Construção de prompt mais robusta (usando searchQuery completo)
-    const prompt = `Forneça a letra ${chordRequest} para a música: "${searchQuery}". Use o formato estrito: SOMENTE A LETRA COMPLETA E FORMATADA.`;
+    const prompt = `Forneça a letra para a música: "${searchQuery}". ${chordInstruction}.${keyInstruction}. Use o formato estrito: SOMENTE A LETRA COMPLETA E FORMATADA em linhas únicas.`;
 
     let response;
     
@@ -1294,7 +1625,6 @@ As linhas de cifras DEVEM SER ENVOLVIDAS em marcadores de negrito Markdown (**) 
                 tools: [{ "google_search": {} }], 
             };
             
-            // *** CORREÇÃO: A URL agora usa o nome correto do modelo 'gemini-2.5-pro' ***
             response = await fetch(GEMINI_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1324,7 +1654,8 @@ As linhas de cifras DEVEM SER ENVOLVIDAS em marcadores de negrito Markdown (**) 
 
 
     const data = await response.json();
-    const resultText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "❌ Não foi possível obter a letra. Tente refinar o título da música.";
+    // NOTA: Removemos os marcadores de negrito antigos para garantir a limpeza na primeira execução
+    const resultText = (data?.candidates?.[0]?.content?.parts?.[0]?.text || "❌ Não foi possível obter a letra. Tente refinar o título da música.").replace(/\*\*/g, '').trim();
     return resultText;
 }
 
@@ -1356,51 +1687,213 @@ function attachGeminiButtons() {
             return;
         }
 
-        // Estrutura de UI aprimorada
+        // *** NOVO: ESTRUTURA DE ACORDEÃO PARA O BLOCO DE BUSCA INTELIGENTE ***
         aiToolsContainer.innerHTML = `
-            <div class="flex items-center justify-between mb-3 border-b pb-2 border-gray-200 dark:border-slate-600">
-                <h6 class="text-sm font-extrabold text-brand-blue dark:text-brand-blue-light"><i class="fas fa-magic mr-2"></i> BUSCA INTELIGENTE (IA)</h6>
-            </div>
-
-            <div class="mb-3">
-                <!-- Checkbox para Cifras -->
-                <label for="chords-toggle-${uniqueId}" class="flex items-center cursor-pointer mb-2">
-                    <input type="checkbox" id="chords-toggle-${uniqueId}" class="include-chords-toggle mr-2 h-4 w-4 text-brand-blue rounded border-gray-300 focus:ring-brand-blue dark:bg-slate-800 dark:border-slate-600" checked>
-                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-300"><i class="fas fa-guitar mr-1"></i> Incluir Cifras (Recomendado)</span>
-                </label>
-                
-                <!-- Campo de Prompt Personalizado -->
-                <label for="custom-prompt-${uniqueId}" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    <i class="fas fa-feather-alt mr-1"></i> Prompt Personalizado (Opcional)
-                </label>
-                <textarea id="custom-prompt-${uniqueId}" class="custom-prompt-input w-full p-2 text-sm rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white shadow-inner focus:ring-1 focus:ring-brand-blue" rows="2" placeholder="Ex: 'Quero a letra na tonalidade de G e o link do YouTube'."></textarea>
-            </div>
-            
-            <button type="button" class="gemini-btn w-full bg-brand-blue hover:bg-brand-blue/90 text-white px-3 py-2 rounded-2xl shadow-lg text-sm font-extrabold transition-colors duration-200 flex items-center justify-center transform hover:scale-[1.01]">
-                <i class="fas fa-search-dollar mr-2"></i> <span class="gemini-btn-text">Buscar Letra e Mídia</span>
+            <!-- Cabeçalho do Acordeão (Botão de Expandir/Recolher) -->
+            <button type="button" id="ai-tools-header-${uniqueId}" class="ai-tools-header accordion-header w-full flex justify-between items-center text-left hover:bg-gray-100 dark:hover:bg-slate-700/70 transition-colors p-1 -m-1 rounded-xl">
+                <h6 class="text-base font-extrabold text-brand-blue dark:text-brand-blue-light flex items-center">
+                    <i class="fas fa-magic mr-2 text-xl"></i> BUSCA INTELIGENTE (IA)
+                </h6>
+                <i class="fas fa-chevron-down transition-transform text-brand-blue text-lg"></i>
             </button>
+
+            <!-- Conteúdo do Acordeão (Campos da IA) -->
+            <div id="ai-content-wrapper-${uniqueId}" class="ai-content-wrapper space-y-3 pt-3">
+                
+                <!-- Novo campo: Nome da Música -->
+                <div class="mb-3">
+                    <label for="song-name-input-${uniqueId}" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <i class="fas fa-music mr-1"></i> Nome da Música (Se diferente do título)
+                    </label>
+                    <input type="text" id="song-name-input-${uniqueId}" class="song-name-input-gemini w-full p-2 text-sm rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white shadow-inner focus:ring-1 focus:ring-brand-blue" placeholder="Ex: Aleluia, Glória a Ti Senhor">
+                </div>
+
+                <!-- Novos campos: Artista e Tom -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label for="artist-input-${uniqueId}" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            <i class="fas fa-user-microphone mr-1"></i> Cantor/Artista
+                        </label>
+                        <input type="text" id="artist-input-${uniqueId}" class="artist-input-gemini w-full p-2 text-sm rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white shadow-inner focus:ring-1 focus:ring-brand-blue" placeholder="Ex: Michael Jackson">
+                    </div>
+                    <div>
+                        <label for="key-input-${uniqueId}" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            <i class="fas fa-key mr-1"></i> Tom/Key (Obrigatório para cifras)
+                        </label>
+                        <input type="text" id="key-input-${uniqueId}" class="key-input-gemini w-full p-2 text-sm rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white shadow-inner focus:ring-1 focus:ring-brand-blue" placeholder="Ex: G, C#m, Bb">
+                    </div>
+                </div>
+
+                <!-- Campo de Prompt Personalizado (movido para baixo) -->
+                <div class="mb-3">
+                    <label for="custom-prompt-${uniqueId}" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <i class="fas fa-feather-alt mr-1"></i> Prompt Personalizado (Instruções Adicionais)
+                    </label>
+                    <textarea id="custom-prompt-${uniqueId}" class="custom-prompt-input w-full p-2 text-sm rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white shadow-inner focus:ring-1 focus:ring-brand-blue" rows="2" placeholder="Ex: 'Quero o refrão repetido duas vezes'."></textarea>
+                </div>
+
+                <!-- Toggle Switch de Cifras e Nível de Complexidade -->
+                <!-- CORREÇÃO VISUAL 3: Borda e sombra mais nítidas no box de opções de cifra -->
+                <div class="mb-4 p-3 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-xl shadow-lg ring-1 ring-brand-blue/10">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center">
+                            <i class="fas fa-guitar mr-2 text-brand-blue"></i> Incluir Cifras
+                        </span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="chords-toggle-${uniqueId}" class="include-chords-toggle sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-blue/30 dark:peer-focus:ring-brand-blue/80 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-blue"></div>
+                        </label>
+                    </div>
+                    
+                    <!-- Botões de Seleção de Complexidade (Visual Toggle) -->
+                    <div id="chord-complexity-container-${uniqueId}" class="transition-all">
+                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Nível da Cifra:</label>
+                        <input type="hidden" id="chord-complexity-value-${uniqueId}" value="simple">
+                        <div class="grid grid-cols-2 gap-2">
+                            <!-- CORREÇÃO DE TAMANHO: Removida a classe text-xs para que o botão tenha tamanho padrão (text-sm) -->
+                            <button type="button" class="complexity-btn selected w-full py-2 px-3 rounded-xl text-sm font-extrabold border transition-all flex items-center justify-center gap-2 bg-brand-blue text-white border-brand-blue shadow-md hover:scale-[1.01]" data-value="simple">
+                                <i class="fas fa-guitar"></i> Simplificada
+                            </button>
+                            <button type="button" class="complexity-btn w-full py-2 px-3 rounded-xl text-sm font-extrabold border transition-all flex items-center justify-center gap-2 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:scale-[1.01]" data-value="complete">
+                                <i class="fas fa-music"></i> Completa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" class="gemini-btn w-full bg-brand-blue hover:bg-brand-blue/90 text-white px-3 py-3 rounded-2xl shadow-lg text-sm font-extrabold transition-colors duration-200 flex items-center justify-center transform hover:scale-[1.01] ring-2 ring-brand-blue/20">
+                        <i class="fas fa-search-dollar mr-2"></i> <span class="gemini-btn-text">Buscar Letra com IA</span>
+                    </button>
+                    <button type="button" class="gemini-cancel-btn w-full bg-red-600 hover:bg-red-700 text-white px-3 py-3 rounded-2xl shadow-lg text-sm font-extrabold transition-colors duration-200 flex items-center justify-center transform hover:scale-[1.01]" style="display: none;">
+                        <i class="fas fa-times mr-2"></i> <span class="gemini-cancel-btn-text">Cancelar</span>
+                    </button>
+                </div>
+            </div>
         `;
+        // *** FIM DA ESTRUTURA DE ACORDEÃO PARA O BLOCO DE BUSCA INTELIGENTE ***
 
         card.appendChild(aiToolsContainer);
 
+        // --- Adicionando Listeners aos novos elementos ---
         const btn = aiToolsContainer.querySelector(".gemini-btn");
         const btnText = aiToolsContainer.querySelector(".gemini-btn-text");
+        const cancelBtn = aiToolsContainer.querySelector(".gemini-cancel-btn");
+        const loadingIcon = aiToolsContainer.querySelector('.fas.fa-search-dollar');
+        
+        const songNameInput = aiToolsContainer.querySelector(".song-name-input-gemini");
+        const artistInput = aiToolsContainer.querySelector(".artist-input-gemini");
+        const keyInput = aiToolsContainer.querySelector(".key-input-gemini");
         const promptInput = aiToolsContainer.querySelector(".custom-prompt-input");
         const chordsToggle = aiToolsContainer.querySelector(".include-chords-toggle");
-        const loadingIcon = aiToolsContainer.querySelector('.fas.fa-search-dollar'); 
+        const complexityContainer = document.getElementById(`chord-complexity-container-${uniqueId}`);
+        const complexityValueInput = document.getElementById(`chord-complexity-value-${uniqueId}`);
+        const complexityButtons = complexityContainer.querySelectorAll('.complexity-btn');
+        // Pega o ID único do input de letra para o overlay
+        const lyricsInput = card.querySelector(".lyrics-input");
+        const lyricsUniqueId = lyricsInput.id.replace('lyrics-', ''); 
+        const lyricsOverlay = document.getElementById(`lyrics-loading-overlay-${lyricsUniqueId}`); // Novo overlay
         
-        // Adiciona o listener de clique
+        // NOVO: Elementos do Acordeão da Busca Inteligente
+        const aiHeaderBtn = aiToolsContainer.querySelector('.ai-tools-header');
+        const aiContent = aiToolsContainer.querySelector('.ai-content-wrapper');
+
+
+        const originalButtonText = btnText.textContent;
+        const originalIconClass = loadingIcon.className;
+
+        // Lógica de Acordeão da Busca Inteligente
+        // *** CORREÇÃO: Inicializa o max-height como 0px para garantir que comece fechado. ***
+        aiContent.style.maxHeight = '0px';
+
+        aiHeaderBtn.addEventListener('click', () => {
+            aiHeaderBtn.classList.toggle('active');
+            if (aiContent.style.maxHeight !== '0px') {
+                aiContent.style.maxHeight = '0px';
+            } else {
+                // Usa scrollHeight + uma margem de segurança
+                // Para calcular o scrollHeight, precisamos que ele esteja visível, mas sem altura fixa. 
+                // A maneira mais robusta é temporariamente dar uma altura grande e medir.
+                // Como não queremos manipular a classe `hidden` ou o `display`, usaremos uma altura temporária.
+                // No entanto, como o conteúdo já está no DOM, scrollHeight deve funcionar.
+                
+                // Mudei o padding-top/bottom do ai-content-wrapper no CSS para 0, 
+                // então scrollHeight deve medir o conteúdo interno mais as margens.
+                aiContent.style.maxHeight = aiContent.scrollHeight + 30 + "px";
+            }
+        });
+
+
+        // Lógica de Seleção de Complexidade (Botões)
+        complexityButtons.forEach(b => {
+            b.addEventListener('click', () => {
+                // Remove seleção de todos
+                complexityButtons.forEach(btn => {
+                    // Estado Não Selecionado (Corrigido)
+                    btn.classList.remove('bg-brand-blue', 'text-white', 'border-brand-blue', 'shadow-md', 'selected');
+                    // Garante o estilo de não selecionado no light/dark mode
+                    btn.classList.add('bg-white', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300', 'border-slate-300', 'dark:border-slate-700');
+                });
+                // Adiciona seleção ao clicado
+                // Estado Selecionado
+                b.classList.remove('bg-white', 'dark:bg-slate-700', 'text-slate-600', 'dark:text-slate-300', 'border-slate-300', 'dark:border-slate-700');
+                b.classList.add('bg-brand-blue', 'text-white', 'border-brand-blue', 'shadow-md', 'selected');
+                // Atualiza input hidden
+                complexityValueInput.value = b.dataset.value;
+            });
+        });
+
+        // Toggle Complexity Visibility
+        chordsToggle.addEventListener('change', () => {
+             if(chordsToggle.checked) {
+                 complexityContainer.classList.remove('hidden', 'opacity-50', 'pointer-events-none');
+             } else {
+                 complexityContainer.classList.add('hidden', 'opacity-50', 'pointer-events-none');
+             }
+        });
+
+
+        // Função para redefinir o estado do botão
+        const resetButtonState = () => {
+            btn.disabled = false;
+            cancelBtn.style.display = 'none';
+            loadingIcon.className = originalIconClass;
+            btnText.textContent = originalButtonText;
+            songNameInput.disabled = false;
+            artistInput.disabled = false;
+            keyInput.disabled = false;
+            promptInput.disabled = false;
+            chordsToggle.disabled = false;
+            complexityButtons.forEach(b => b.disabled = false);
+            lyricsOverlay?.classList.add('hidden'); // Oculta o overlay
+        };
+
+        // Listener do Botão de Cancelar
+        cancelBtn.addEventListener("click", () => {
+            resetButtonState();
+            // NOTA: Isso não aborta a requisição fetch (que exigiria AbortController),
+            // mas restaura a UI imediatamente para o usuário.
+            // Poderíamos restaurar a letra original se quiséssemos.
+        });
+
+        // Listener do Botão de Buscar
         btn.addEventListener("click", async () => {
             const title = card.querySelector(".song-title-input")?.value.trim();
             const lyricsInput = card.querySelector(".lyrics-input");
             const linkInput = card.querySelector(".link-input");
+            
+            // Pega valores dos novos campos
+            const explicitSongName = songNameInput.value.trim();
+            const artist = artistInput.value.trim();
+            const songKey = keyInput.value.trim();
             const customPrompt = promptInput.value.trim();
             const includeChords = chordsToggle.checked; 
+            const complexity = complexityValueInput.value;
             
-            const queryForIA = buildSearchQuery(title, customPrompt);
+            // Constrói a query robusta
+            const queryForIA = buildSearchQuery(explicitSongName, title, artist, songKey, customPrompt);
             
-            const originalButtonText = btnText.textContent;
-            const originalIconClass = loadingIcon.className;
             const originalLyrics = lyricsInput.value;
 
             if (!queryForIA) {
@@ -1410,17 +1903,27 @@ function attachGeminiButtons() {
 
             // Mostrar estado de carregamento
             btn.disabled = true;
-            btnText.textContent = "Buscando...";
+            cancelBtn.style.display = 'flex';
             loadingIcon.className = 'fas fa-spinner fa-spin mr-2';
-            lyricsInput.value = "🎧 Buscando Letra com IA...";
+            btnText.textContent = "Buscando...";
+            songNameInput.disabled = true;
+            artistInput.disabled = true;
+            keyInput.disabled = true;
+            promptInput.disabled = true;
+            chordsToggle.disabled = true;
+            complexityButtons.forEach(b => b.disabled = true);
+            
+            // ** NOVO: Exibe o overlay e LIMPA o valor do textarea para mostrar o overlay **
+            lyricsOverlay?.classList.remove('hidden');
+            lyricsInput.value = ""; 
             linkInput.value = ""; 
             
             // Remove qualquer widget de seleção anterior
             card.querySelectorAll('.media-selection-widget').forEach(w => w.remove());
 
             try {
-                // 1. CHAMA A IA (PEGA A LETRA) - Usando queryForIA
-                const lyricsResult = await fetchSongWithGemini(queryForIA, includeChords); 
+                // 1. CHAMA A IA (PEGA A LETRA) - Usando queryForIA E a chave
+                const lyricsResult = await fetchSongWithGemini(queryForIA, includeChords, complexity, songKey); 
                 
                 // 2. POPULA A LETRA
                 lyricsInput.value = lyricsResult;
@@ -1435,9 +1938,7 @@ function attachGeminiButtons() {
                 renderMediaSearchButtons(queryForIA, card); // Adiciona os botões de busca manual mesmo em caso de erro na letra
             } finally {
                 // Restaurar estado do botão
-                btn.disabled = false;
-                btnText.textContent = originalButtonText;
-                loadingIcon.className = originalIconClass;
+                resetButtonState();
             }
         });
     });
