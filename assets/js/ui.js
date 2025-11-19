@@ -1,10 +1,15 @@
-import { logAction, getDB } from './firebase.js';
+import { logAction } from './firebase.js';
 import { getCurrentUser, isSuperAdmin } from './auth.js';
 
 // --- MODAL & CONFIRMATION HELPERS ---
 
 /**
  * Attaches opening/closing logic to a modal element.
+ * @param {string} modalId O ID do elemento modal.
+ * @param {string} openBtnId O ID do botão que abre o modal.
+ * @param {string} closeBtnId O ID do botão que fecha o modal.
+ * @param {function} onOpen Função de callback executada ao abrir o modal.
+ * @returns {function} A função de fechar o modal.
  */
 export function setupModalInteraction(modalId, openBtnId, closeBtnId, onOpen) {
     const modal = document.getElementById(modalId);
@@ -13,16 +18,25 @@ export function setupModalInteraction(modalId, openBtnId, closeBtnId, onOpen) {
     
     if (!modal || (!openBtn && openBtnId) || !closeBtn) return;
     
+    // Adiciona classes de transição ao modal e ao conteúdo para melhor aparência
+    modal.classList.add('fixed', 'inset-0', 'bg-black/50', 'z-50', 'modal-overlay', 'transition-opacity', 'duration-300', 'flex', 'items-center', 'justify-center', 'opacity-0', 'hidden');
+    
     const content = modal.querySelector('.modal-content');
+    if (content) {
+        content.classList.add('transition-all', 'duration-300', 'transform', 'scale-95', 'opacity-0');
+    }
     
     const openModal = () => {
         modal.classList.add('is-open'); // Add custom open class for tracking
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         
+        // CORREÇÃO UX: Remove opacity-0 e scale-95 para iniciar a transição
         setTimeout(() => {
             modal.classList.remove('opacity-0');
-            content.classList.remove('scale-95', 'opacity-0');
+            if (content) {
+                content.classList.remove('scale-95', 'opacity-0');
+            }
         }, 10);
         
         // Logging
@@ -30,7 +44,9 @@ export function setupModalInteraction(modalId, openBtnId, closeBtnId, onOpen) {
         if (currentUser && openBtnId) {
             try {
                 const openButtonElement = document.getElementById(openBtnId);
-                const cardTitle = openButtonElement?.querySelector('h3')?.textContent.trim() || openBtnId.replace(/open-|-modal|-trigger/g, ' ').trim();
+                // Tenta extrair um título mais limpo
+                const cardTitle = openButtonElement?.querySelector('h3')?.textContent?.trim() || 
+                                  openBtnId.replace(/open-|-modal|-trigger/g, ' ').trim();
                 const module = cardTitle || modalId.replace('-modal', '');
                 logAction('Abriu Ferramenta', module, `Usuário abriu o modal '${module}'.`);
             } catch (e) {
@@ -42,7 +58,9 @@ export function setupModalInteraction(modalId, openBtnId, closeBtnId, onOpen) {
     };
 
     const closeModal = () => {
-        content.classList.add('scale-95', 'opacity-0');
+        if (content) {
+            content.classList.add('scale-95', 'opacity-0');
+        }
         modal.classList.add('opacity-0');
         modal.classList.remove('is-open');
         
@@ -63,30 +81,46 @@ export function setupModalInteraction(modalId, openBtnId, closeBtnId, onOpen) {
     return closeModal;
 }
 
+/**
+ * Abre o modal de confirmação com uma mensagem e callback.
+ */
 export function openConfirmationModal(message, onConfirm) {
     const modal = document.getElementById('confirmation-modal');
     if (!modal) return;
     
+    // Assegura que o modal tem as classes de transição
+    modal.classList.add('transition-opacity', 'duration-300', 'opacity-0');
+
     const content = modal.querySelector('.modal-content');
     const confirmMessage = modal.querySelector('#confirmation-message');
-    const confirmBtn = modal.querySelector('#confirm-action-btn');
-    const cancelBtn = modal.querySelector('#cancel-confirmation-btn');
+    let confirmBtn = modal.querySelector('#confirm-action-btn');
+    let cancelBtn = modal.querySelector('#cancel-confirmation-btn');
+
+    // Assegura que o conteúdo tem as classes de transição
+    if (content) {
+        content.classList.add('transition-all', 'duration-300', 'transform', 'scale-95', 'opacity-0');
+    }
 
     confirmMessage.textContent = message;
 
-    // Remove previous listeners to prevent stacking confirmations
+    // --- CORREÇÃO DE LISTENERS: Clonagem de nós para evitar empilhamento ---
+    
     const newConfirmBtn = confirmBtn.cloneNode(true);
     confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-    
+    confirmBtn = newConfirmBtn; // Reatribui para o novo nó
+
     const newCancelBtn = cancelBtn.cloneNode(true);
     cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    cancelBtn = newCancelBtn; // Reatribui para o novo nó
+    
+    // --- Configura Novos Listeners ---
 
-    newConfirmBtn.onclick = () => {
+    confirmBtn.onclick = () => {
         onConfirm();
         closeConfirmationModal();
     };
 
-    newCancelBtn.onclick = () => {
+    cancelBtn.onclick = () => {
         closeConfirmationModal();
     };
 
@@ -102,17 +136,24 @@ export function openConfirmationModal(message, onConfirm) {
     
     setTimeout(() => {
         modal.classList.remove('opacity-0');
-        content.classList.remove('scale-95', 'opacity-0');
+        if (content) {
+            content.classList.remove('scale-95', 'opacity-0');
+        }
     }, 10);
 }
 
+/**
+ * Fecha o modal de confirmação.
+ */
 export function closeConfirmationModal() {
     const modal = document.getElementById('confirmation-modal');
     if (!modal || modal.classList.contains('hidden')) return;
 
     const content = modal.querySelector('.modal-content');
     
-    content.classList.add('scale-95', 'opacity-0');
+    if (content) {
+        content.classList.add('scale-95', 'opacity-0');
+    }
     modal.classList.add('opacity-0');
     modal.classList.remove('is-open');
     
@@ -126,10 +167,14 @@ export function closeConfirmationModal() {
 
 // --- GENERAL UI HELPERS ---
 
+/**
+ * Exibe feedback visual no elemento especificado.
+ */
 export function showFeedback(elementId, message, isError = true, duration = 4000) {
     const el = document.getElementById(elementId);
     if (!el) return;
     
+    // Garante que o elemento está visível e com classes de cor corretas
     el.textContent = message;
     el.classList.toggle('text-red-600', isError);
     el.classList.toggle('text-green-600', !isError);
@@ -224,9 +269,9 @@ export function handleHeaderScroll() {
     // Header Background
     if (scrolled) {
          header.classList.remove('bg-transparent');
-         header.classList.add('bg-white/95', 'dark:bg-darkbg/95');
+         header.classList.add('bg-white/95', 'dark:bg-darkbg/95', 'shadow-md'); // Adicionado shadow
     } else {
-         header.classList.remove('bg-white/95', 'dark:bg-darkbg/95');
+         header.classList.remove('bg-white/95', 'dark:bg-darkbg/95', 'shadow-md');
          header.classList.add('bg-transparent');
     }
     
@@ -235,6 +280,8 @@ export function handleHeaderScroll() {
     const p = header.querySelector('p');
     const mobileButton = document.getElementById('mobile-menu-button');
     const mobileThemeButton = document.getElementById('mobile-theme-toggle');
+    const desktopThemeButton = document.getElementById('desktop-theme-toggle');
+
 
     h1.classList.toggle('text-white', !scrolled);
     h1.classList.toggle('text-brand-blue', scrolled);
@@ -251,6 +298,8 @@ export function handleHeaderScroll() {
     mobileThemeButton.classList.toggle('text-brand-text', scrolled && !isDark);
     mobileThemeButton.classList.toggle('dark:text-white', scrolled && isDark);
 
+
+    // Ajustando links de navegação para mobile (se estiverem visíveis)
     header.querySelectorAll('nav.hidden a:not(#header-cta-btn)').forEach(link => {
         link.classList.toggle('text-slate-200', !scrolled);
         link.classList.toggle('hover:text-white', !scrolled);
@@ -260,7 +309,7 @@ export function handleHeaderScroll() {
         link.classList.toggle('dark:hover:text-white', scrolled && isDark);
     });
     
-    const desktopThemeButton = document.getElementById('desktop-theme-toggle');
+    // Ajustando botão de tema desktop
     desktopThemeButton.classList.toggle('text-slate-200', !scrolled);
     desktopThemeButton.classList.toggle('hover:text-white', !scrolled);
     desktopThemeButton.classList.toggle('text-slate-600', scrolled && !isDark);
@@ -268,3 +317,36 @@ export function handleHeaderScroll() {
     desktopThemeButton.classList.toggle('dark:text-slate-300', scrolled && isDark);
     desktopThemeButton.classList.toggle('dark:hover:text-white', scrolled && isDark);
 }
+
+// --- NOVO: Logging de Atividade de Rolagem para Análise de Engajamento ---
+
+/**
+ * Loga a rolagem do usuário a cada 500px, para medir engajamento.
+ */
+let lastScrollLogPosition = 0;
+const SCROLL_LOG_THRESHOLD = 500; // Loga a cada 500 pixels de distância
+
+export function logScroll() {
+    // Calcula a posição atual de rolagem vertical
+    const currentScrollPosition = window.scrollY || document.documentElement.scrollTop;
+    
+    // Verifica se a distância percorrida é maior que o threshold
+    if (Math.abs(currentScrollPosition - lastScrollLogPosition) >= SCROLL_LOG_THRESHOLD) {
+        
+        // Determina a direção da rolagem
+        const direction = currentScrollPosition > lastScrollLogPosition ? 'Down' : 'Up';
+        
+        // O log de ação é crucial aqui
+        logAction(
+            'Rolagem de Conteúdo', 
+            'Interface', 
+            `Rolou ${direction} para a posição Y: ${currentScrollPosition.toFixed(0)}px`
+        );
+        
+        // Atualiza a última posição registrada
+        lastScrollLogPosition = currentScrollPosition;
+    }
+}
+
+// Inicializa o listener de rolagem (deve ser chamado uma única vez, ex: em main.js)
+// window.addEventListener('scroll', logScroll);

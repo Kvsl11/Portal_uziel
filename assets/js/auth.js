@@ -1,6 +1,7 @@
-import { logAction, getDB, getAppId, getAuthInstance, getMembers, getCollectionRef, addDoc, updateDoc, where, query, getDocs, SUPER_ADMIN_USERNAME, writeBatch, doc } from './firebase.js';
-import { handleHeaderScroll } from './ui.js';
+import { logAction, getDB, getAppId, getAuthInstance, getMembers, getCollectionRef, addDoc, updateDoc, where, query, getDocs, SUPER_ADMIN_USERNAME, writeBatch, doc, deleteDoc as fsDeleteDoc } from './firebase.js';
+import { handleHeaderScroll, showFeedback } from './ui.js'; // Adicionei showFeedback aqui para melhor UX
 
+// --- CONFIGURAÇÃO INICIAL (Dados Locais Seguros) ---
 let userCredentials = [];
 let notificationSenderUsername = null;
 let automaticNotificationsEnabled = true;
@@ -33,8 +34,14 @@ export function loadUserCredentials() {
     automaticNotificationsEnabled = storedNotificationSetting === null ? true : JSON.parse(storedNotificationSetting);
 
     if (storedUsers) {
+        // CORREÇÃO: Garante que todos os campos obrigatórios existam ao carregar (ex: whatsapp)
         let parsedUsers = JSON.parse(storedUsers);
-        userCredentials = parsedUsers.map(u => ({ ...u, whatsapp: u.whatsapp || '' }));
+        userCredentials = parsedUsers.map(u => ({ 
+            ...u, 
+            whatsapp: u.whatsapp || '',
+            role: u.role || 'member', // Garante que tenha uma função padrão
+            name: u.name || u.username.split('@')[0].toUpperCase() // Garante que tenha um nome
+        }));
     } else {
         userCredentials = initialUserCredentials;
         saveUserCredentials();
@@ -54,51 +61,74 @@ export function updateNotificationConfig(senderUsername, notificationsEnabled) {
     notificationSenderUsername = senderUsername;
     automaticNotificationsEnabled = notificationsEnabled;
     saveUserCredentials();
+    showFeedback('generator-feedback', 'Configurações de notificação salvas.', false);
 }
 
 
-// --- LOGIN/LOGOUT LOGIC ---
+// --- LOGIN/LOGOUT LOGIC (APARÊNCIA E UX) ---
 export function setLoggedInState(user) {
     const contentElements = document.querySelectorAll('main, footer, header');
     const mainLoginOverlay = document.getElementById('main-login-overlay');
     const headerCtaBtn = document.getElementById('header-cta-btn');
     const mobileHeaderCtaBtn = document.getElementById('mobile-header-cta-btn');
-    const userManagementCard = document.getElementById('user-management-card-wrapper');
-    const whatsappConfigCard = document.getElementById('whatsapp-config-card-wrapper');
-    const auditLogCard = document.getElementById('audit-log-card-wrapper');
+    // Adicionei os wrappers para melhor legibilidade
+    const userManagementWrapper = document.getElementById('user-management-card-wrapper');
+    const whatsappConfigWrapper = document.getElementById('whatsapp-config-card-wrapper');
+    const auditLogWrapper = document.getElementById('audit-log-card-wrapper');
 
     localStorage.setItem('currentUser', JSON.stringify(user));
-    mainLoginOverlay.classList.add('hidden');
+    
+    // Animação de transição para o login (melhor UX)
+    mainLoginOverlay.classList.remove('flex');
+    mainLoginOverlay.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+    setTimeout(() => {
+        mainLoginOverlay.classList.add('hidden');
+    }, 500);
+
     contentElements.forEach(el => el.classList.remove('content-hidden'));
     
     const isCurrentUserSuperAdmin = isSuperAdmin(user);
 
-    if (user.role === 'admin' || isCurrentUserSuperAdmin) {
-        userManagementCard.classList.remove('hidden', 'filtered-out');
-    } else {
-        userManagementCard.classList.add('hidden', 'filtered-out');
-    }
+    // Gestão de Permissões (Aparência Funcional)
+    const isAdmin = (user.role === 'admin' || isCurrentUserSuperAdmin);
 
-    if (isCurrentUserSuperAdmin) {
-        whatsappConfigCard.classList.remove('hidden', 'filtered-out');
-        auditLogCard.classList.remove('hidden', 'filtered-out');
-        if (typeof window.initializeWhatsAppConfig === 'function') window.initializeWhatsAppConfig();
-    } else {
-        whatsappConfigCard.classList.add('hidden', 'filtered-out');
-        auditLogCard.classList.add('hidden', 'filtered-out');
+    if (userManagementWrapper) {
+        userManagementWrapper.classList.toggle('hidden', !isAdmin);
+        userManagementWrapper.classList.toggle('filtered-out', !isAdmin);
     }
     
+    if (whatsappConfigWrapper) {
+        whatsappConfigWrapper.classList.toggle('hidden', !isCurrentUserSuperAdmin);
+        whatsappConfigWrapper.classList.toggle('filtered-out', !isCurrentUserSuperAdmin);
+    }
+    
+    if (auditLogWrapper) {
+        auditLogWrapper.classList.toggle('hidden', !isCurrentUserSuperAdmin);
+        auditLogWrapper.classList.toggle('filtered-out', !isCurrentUserSuperAdmin);
+        if (isCurrentUserSuperAdmin && typeof window.initializeAuditLog === 'function') {
+             // Chamada da função de inicialização de logs (Assumindo que está em admin.js)
+             window.initializeAuditLog(); 
+        }
+    }
+
+    if (isCurrentUserSuperAdmin && typeof window.initializeWhatsAppConfig === 'function') {
+        window.initializeWhatsAppConfig();
+    }
+
+    // Atualiza botões de Sair (Melhor Aparência)
     const logoutAction = (evt) => { evt.preventDefault(); logout(); };
     
-    headerCtaBtn.textContent = 'Sair';
-    headerCtaBtn.href = '#';
-    headerCtaBtn.removeAttribute('target');
-    headerCtaBtn.onclick = logoutAction;
-
-    mobileHeaderCtaBtn.textContent = 'Sair';
-    mobileHeaderCtaBtn.href = '#';
-    mobileHeaderCtaBtn.removeAttribute('target');
-    mobileHeaderCtaBtn.onclick = logoutAction;
+    [headerCtaBtn, mobileHeaderCtaBtn].forEach(btn => {
+        if (btn) {
+            btn.textContent = `Sair (${user.name.split(' ')[0]})`; // Mostra o primeiro nome
+            btn.href = '#';
+            btn.removeAttribute('target');
+            btn.onclick = logoutAction;
+            // Adiciona classe de estilo para logout (pode ser útil no CSS global)
+            btn.classList.add('bg-red-600', 'hover:bg-red-700', 'text-white', 'font-semibold');
+            btn.classList.remove('bg-brand-blue');
+        }
+    });
 
     handleHeaderScroll();
 }
@@ -106,22 +136,30 @@ export function setLoggedInState(user) {
 export function logout() {
     localStorage.removeItem('currentUser');
     const auth = getAuthInstance();
-    // A função signOut precisa estar importada no firebase.js, e o Firebase já foi corrigido para isso.
-    if (auth) {
-        // A função signOut é importada no firebase.js, mas não é exportada. Mantemos o logout local.
+    // Tenta deslogar do Firebase (mantendo a lógica original)
+    if (auth && typeof auth.signOut === 'function') {
+        // Esta função depende do import correto em firebase.js (não está aqui, mas o fluxo é mantido)
+        // auth.signOut();
     } 
+    // Atualização da UI para login
     window.location.reload(); 
 }
 
 export function initializeLoginForm() {
     const mainLoginForm = document.getElementById('main-login-form');
     const mainLoginError = document.getElementById('main-login-error');
+    const loginButton = document.getElementById('main-login-btn');
     
     mainLoginForm?.addEventListener('submit', (e) => {
         e.preventDefault();
         mainLoginError.textContent = '';
         
+        // Ativar estado de carregamento
+        loginButton.disabled = true;
+        loginButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> Entrando...`;
+
         const usernameInput = mainLoginForm['main-username'].value.trim().toLowerCase();
+        // Permite login apenas com prefixo ou com o @uziel.com completo
         const username = usernameInput.includes('@') ? usernameInput : `${usernameInput}@uziel.com`;
         const password = mainLoginForm['main-password'].value;
         
@@ -133,6 +171,11 @@ export function initializeLoginForm() {
             mainLoginForm.reset();
         } else {
             mainLoginError.textContent = 'Usuário ou senha inválidos.';
+            mainLoginError.classList.add('text-red-500');
+            
+            // Reverter estado do botão após falha
+            loginButton.disabled = false;
+            loginButton.innerHTML = 'Entrar'; 
         }
     });
 }
@@ -144,8 +187,9 @@ export function initializeLoginForm() {
 export async function syncUsersToFirestore() {
     const db = getDB();
     const appId = getAppId();
-    const currentMembers = getMembers(); // Lista de membros do Firestore (sincronizada)
-    const localUsers = getUserCredentials(); // Lista de usuários locais
+    // Assume que getMembers() é um getter que retorna a lista de membros sincronizada do Firestore
+    const currentMembers = getMembers() || []; 
+    const localUsers = getUserCredentials(); 
 
     if (!db || localUsers.length === 0) return;
 
@@ -153,24 +197,21 @@ export async function syncUsersToFirestore() {
     const batch = writeBatch(db);
     let syncCount = 0;
     
-    // CORREÇÃO: Usar um Map para garantir a unicidade pelo NOME COMPLETO.
+    // CORREÇÃO: Garante que apenas a primeira ocorrência de cada nome seja mantida
     const uniqueUsersMap = new Map();
     localUsers.forEach(user => {
-        // Garante que apenas a primeira ocorrência de cada nome seja mantida
         if (!uniqueUsersMap.has(user.name)) {
             uniqueUsersMap.set(user.name, user);
         }
     });
     const uniqueLocalUsers = Array.from(uniqueUsersMap.values());
-    // FIM DA CORREÇÃO DE DUPLICIDADE
-
+    
     uniqueLocalUsers.forEach(localUser => {
         // Verificamos se o membro já existe na lista sincronizada do Firebase
         const isMember = currentMembers.some(member => member.name === localUser.name);
         
         if (!isMember) {
             // Membro não encontrado no Firestore, precisa ser criado
-            // Usamos doc(collectionRef) para obter uma nova referência de documento (sintaxe modular correta)
             const memberDocRef = doc(membersCol); 
             
             batch.set(memberDocRef, { 
@@ -194,38 +235,67 @@ export async function syncUsersToFirestore() {
 
 
 // --- USER CRUD (Used by admin.js) ---
+
+/**
+ * Cria um novo usuário localmente e o sincroniza com o Firestore.
+ * @param {string} name Nome completo do usuário.
+ * @param {string} usernamePrefix Prefixo do nome de usuário (ex: 'joao').
+ * @param {string} password Senha.
+ * @param {string} role Função (role).
+ * @param {HTMLElement} errorEl Elemento para exibir erros.
+ * @returns {Promise<boolean>} Retorna true se o usuário foi criado com sucesso.
+ */
 export async function createNewUser(name, usernamePrefix, password, role, errorEl) {
     const db = getDB();
     const appId = getAppId();
-    if (!name || !usernamePrefix || !password) { errorEl.textContent = 'Todos os campos são obrigatórios.'; return; }
+    if (!name || !usernamePrefix || !password || !role) { 
+        errorEl.textContent = 'Todos os campos são obrigatórios.'; 
+        return false; 
+    }
+    
     const username = `${usernamePrefix}@uziel.com`;
-    if (userCredentials.some(u => u.username === username)) { errorEl.textContent = 'Este usuário já existe.'; return; }
+    if (userCredentials.some(u => u.username === username)) { 
+        errorEl.textContent = 'Este usuário já existe.'; 
+        return false; 
+    }
     
     const newUser = { name: name.toUpperCase().trim(), username, password, role, whatsapp: '' };
     userCredentials.push(newUser);
     saveUserCredentials();
     logAction('Usuário Criado', 'Gestão de Usuários', `Usuário criado: ${newUser.name} (${username})`);
     
+    // Sincroniza com o Firestore para Controle de Presença
     try {
         const membersCol = getCollectionRef(`artifacts/${appId}/public/data/members`);
         await addDoc(membersCol, { name: newUser.name, totalPoints: 0 });
-    } catch (error) { console.error("Erro ao adicionar membro ao Firestore: ", error); }
+    } catch (error) { 
+        console.error("Erro ao adicionar membro ao Firestore: ", error); 
+        errorEl.textContent = 'Usuário criado localmente, mas falha ao sincronizar com o Controle de Presença.';
+    }
     
     return true;
 }
 
+/**
+ * Exclui um usuário localmente e remove todos os seus registros no Firestore.
+ * @param {string} usernameToDelete Nome de usuário completo a ser excluído.
+ * @param {Object} userToDelete Objeto do usuário a ser excluído (para logs e nome).
+ */
 export async function deleteUser(usernameToDelete, userToDelete) {
     const db = getDB();
     const appId = getAppId();
+    
+    // 1. Exclusão Local
     userCredentials = userCredentials.filter(u => u.username !== usernameToDelete);
     saveUserCredentials();
     logAction('Usuário Excluído', 'Gestão de Usuários', `Usuário excluído: ${userToDelete.name} (${userToDelete.username})`);
     
+    // 2. Exclusão no Firestore (Membros e Presenças)
     try {
         const membersCol = getCollectionRef(`artifacts/${appId}/public/data/members`);
         const attendanceCol = getCollectionRef(`artifacts/${appId}/public/data/attendance`);
         
-        // Find member ID based on name
+        // Encontra o documento do membro baseado no nome
         const memberQuery = query(membersCol, where("name", "==", userToDelete.name));
         const memberSnapshot = await getDocs(memberQuery);
         
@@ -234,49 +304,120 @@ export async function deleteUser(usernameToDelete, userToDelete) {
             const memberId = memberDoc.id;
             const batch = writeBatch(db);
             
-            // Delete all attendance records for this member
+            // Deleta todos os registros de presença (attendance)
             const attendanceQuery = query(attendanceCol, where("memberId", "==", memberId));
             const attendanceSnapshot = await getDocs(attendanceQuery);
             attendanceSnapshot.forEach(doc => batch.delete(doc.ref));
             
-            // Delete member document
+            // Deleta o documento do membro
             batch.delete(memberDoc.ref);
             await batch.commit();
+            console.log(`[Firestore] Dados de ${userToDelete.name} e ${attendanceSnapshot.size} registros de presença excluídos.`);
+        } else {
+             console.log(`[Firestore] Membro ${userToDelete.name} não encontrado para exclusão.`);
         }
-    } catch (error) { console.error("Erro ao excluir usuário do Firestore: ", error); }
+    } catch (error) { 
+        console.error("Erro ao excluir usuário do Firestore: ", error); 
+        // Usar showFeedback() aqui seria bom, mas esta função é chamada de um modal que já lida com o feedback.
+    }
 }
 
+/**
+ * Atualiza os detalhes de um usuário localmente e sincroniza as mudanças de nome no Firestore.
+ * @param {string} originalUsername Nome de usuário original (chave primária).
+ * @param {string} newName Novo nome completo.
+ * @param {string} newRole Nova função (role).
+ * @param {string} newPassword Nova senha (opcional).
+ * @param {HTMLElement} errorEl Elemento para exibir erros.
+ * @returns {Promise<boolean>} Retorna true se o usuário foi atualizado com sucesso.
+ */
 export async function updateUser(originalUsername, newName, newRole, newPassword, errorEl) {
     const db = getDB();
     const appId = getAppId();
     const userToEditIndex = userCredentials.findIndex(u => u.username === originalUsername);
 
-    if (userToEditIndex === -1) { errorEl.textContent = 'Usuário não encontrado.'; return false; }
+    if (userToEditIndex === -1) { 
+        errorEl.textContent = 'Usuário não encontrado.'; 
+        return false; 
+    }
     
+    if (!newName || !newRole) {
+        errorEl.textContent = 'Nome e função são obrigatórios.';
+        return false;
+    }
+
     const userToEdit = userCredentials[userToEditIndex];
     const originalName = userToEdit.name;
     
-    userCredentials[userToEditIndex].name = newName;
+    // 1. Atualização Local
+    userCredentials[userToEditIndex].name = newName.toUpperCase().trim();
     userCredentials[userToEditIndex].role = newRole;
     if (newPassword.trim() !== '') {
+        // CORREÇÃO: Garante que a senha não seja salva vazia se não foi alterada
         userCredentials[userToEditIndex].password = newPassword.trim();
+    }
+
+    // Se o usuário atualizou a si mesmo, o localStorage precisa ser refrescado.
+    const currentUser = getCurrentUser();
+    if (currentUser && currentUser.username === originalUsername) {
+        // Atualiza apenas os campos relevantes no currentUser
+        currentUser.name = userCredentials[userToEditIndex].name;
+        currentUser.role = userCredentials[userToEditIndex].role;
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        // Nota: setLoggedInState não é chamado aqui, para evitar recarregar toda a UI,
+        // mas as permissões baseadas em 'currentUser' serão atualizadas no próximo refresh.
     }
 
     saveUserCredentials();
     logAction('Usuário Atualizado', 'Gestão de Usuários', `Detalhes atualizados para ${newName}`);
 
-    if (originalName !== newName) {
+    // 2. Sincronização de Nome no Firestore
+    if (originalName !== newName.toUpperCase().trim()) {
         try {
             const membersCol = getCollectionRef(`artifacts/${appId}/public/data/members`);
             const q = query(membersCol, where("name", "==", originalName));
             const querySnapshot = await getDocs(q);
+            
             if (!querySnapshot.empty) {
                 const memberDocRef = querySnapshot.docs[0].ref;
-                await updateDoc(memberDocRef, { name: newName });
+                // CORREÇÃO: Usar updateDoc na referência do documento, e garantir nome em maiúsculas
+                await updateDoc(memberDocRef, { name: newName.toUpperCase().trim() });
             }
         } catch (error) {
             console.error("Erro ao atualizar o nome do membro no Firestore:", error);
+            errorEl.textContent += ' Erro ao sincronizar o novo nome com o Controle de Presença.';
+            return false;
         }
     }
+    return true;
+}
+
+// --- NOVO: Funções para Gerenciamento de WhatsApp (UX Aprimorada) ---
+
+/**
+ * Atualiza o número de WhatsApp de um usuário (usado no modal de Perfil/Configurações).
+ * @param {string} username O username do usuário.
+ * @param {string} whatsapp O novo número de WhatsApp.
+ * @returns {boolean} Sucesso.
+ */
+export function updateWhatsApp(username, whatsapp) {
+    const userToEditIndex = userCredentials.findIndex(u => u.username === username);
+
+    if (userToEditIndex === -1) {
+        console.error('Usuário não encontrado para atualização de WhatsApp.');
+        return false;
+    }
+
+    userCredentials[userToEditIndex].whatsapp = whatsapp.trim();
+    saveUserCredentials();
+
+    // Atualiza o estado local do usuário logado se for o caso
+    const currentUser = getCurrentUser();
+    if (currentUser && currentUser.username === username) {
+        currentUser.whatsapp = whatsapp.trim();
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    }
+
+    logAction('WhatsApp Atualizado', 'Gestão de Usuários', `WhatsApp atualizado para ${username}`);
     return true;
 }
