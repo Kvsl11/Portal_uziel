@@ -1,0 +1,145 @@
+*** Begin Patch
+*** Update File: index.html
+@@
+     <meta name="description" content="Portal interno para membros do Ministério Uziel. Acesse links, documentos e ferramentas importantes.">
++
++    <!-- Content Security Policy to mitigate XSS and other injection attacks -->
++    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.tailwindcss.com 'unsafe-inline'; connect-src 'self'">
+@@
+-    <script src="https://cdn.tailwindcss.com"></script>
++    <!-- Defer external scripts so they don't block rendering -->
++    <script src="https://cdn.tailwindcss.com" defer></script>
+@@
+-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+-    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.min.js"></script>
+-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
++    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
++    <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.min.js" defer></script>
++    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
++    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
++    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js" defer></script>
+@@
+-         navigator.serviceWorker.register('/Portal_uziel/assets/js/service-worker.js', { scope: '/Portal_uziel/' })
++         navigator.serviceWorker.register('/Portal_uziel/assets/service-worker.js', { scope: '/Portal_uziel/' })
+@@
+-     <!-- Global Security Block (Mantido aqui, mas idealmente configurado via server/PWA) -->
+-     <script>
+-         (function disableInspect() {
+-         document.addEventListener('contextmenu', e => e.preventDefault());
+-         document.addEventListener('keydown', e => {
+-             const forbidden =
+-             e.key === 'F12' ||
+-             (e.ctrlKey && e.shiftKey && ['I', 'J'].includes(e.key)) ||
+-             (e.ctrlKey && e.key === 'U');
+-             if (forbidden) e.preventDefault();
+-         });
+-         })();
+-     </script>
++     <!-- Removed insecure disableInspect script for better accessibility and to follow security best practices -->
+@@
+-                 <button type="submit" class="w-full bg-brand-blue text-white font-bold py-3 px-6 rounded-lg hover:bg-brand-dark-blue transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">Entrar</button>
++                 <button type="submit" id="main-login-btn" class="w-full bg-brand-blue text-white font-bold py-3 px-6 rounded-lg hover:bg-brand-dark-blue transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">Entrar</button>
+@@
+     <!-- Confirmation Modal -->
+@@
+     </div>
++
++    <!-- Back to Top Button -->
++    <button id="back-to-top" class="hidden fixed bottom-8 right-8 bg-brand-blue text-white p-4 rounded-full shadow-lg hover:bg-brand-dark-blue transition-transform transform hover:scale-110" aria-label="Voltar ao topo">
++        <i class="fas fa-arrow-up"></i>
++    </button>
+@@
+-     <script type="module" src="assets/js/main.js"></script>
++    <!-- Additional UX scripts -->
++    <script>
++        // Most external links open in a new tab; enforce security by adding rel="noopener noreferrer"
++        document.querySelectorAll('a[target="_blank"]').forEach(a => {
++            if (!a.getAttribute('rel')) {
++                a.setAttribute('rel', 'noopener noreferrer');
++            }
++        });
++        // Back-to-top button logic
++        const backToTopBtn = document.getElementById('back-to-top');
++        window.addEventListener('scroll', () => {
++            if (window.scrollY > 300) {
++                backToTopBtn.classList.remove('hidden');
++            } else {
++                backToTopBtn.classList.add('hidden');
++            }
++        });
++        backToTopBtn.addEventListener('click', () => {
++            window.scrollTo({ top: 0, behavior: 'smooth' });
++        });
++    </script>
++    <script type="module" src="assets/js/main.js"></script>
+*** End Patch
+*** Update File: assets/js/auth.js
+@@
+-export const getCurrentUser = () => JSON.parse(localStorage.getItem('currentUser') || 'null');
++// Use sessionStorage to limit persistence of credentials to the session
++export const getCurrentUser = () => JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+@@
+-export function loadUserCredentials() {
+-    const storedUsers = localStorage.getItem('userCredentials');
+-    notificationSenderUsername = localStorage.getItem('notificationSenderUsername');
+-    const storedNotificationSetting = localStorage.getItem('automaticNotificationsEnabled');
+-    automaticNotificationsEnabled = storedNotificationSetting === null ? true : JSON.parse(storedNotificationSetting);
++export function loadUserCredentials() {
++    const storedUsers = sessionStorage.getItem('userCredentials');
++    notificationSenderUsername = sessionStorage.getItem('notificationSenderUsername');
++    const storedNotificationSetting = sessionStorage.getItem('automaticNotificationsEnabled');
++    automaticNotificationsEnabled = storedNotificationSetting === null ? true : JSON.parse(storedNotificationSetting);
+@@
+-        userCredentials = initialUserCredentials;
+-        saveUserCredentials();
++        userCredentials = initialUserCredentials;
++        saveUserCredentials();
+@@
+ export function saveUserCredentials(newCredentials = userCredentials) {
+     userCredentials = newCredentials;
+-    localStorage.setItem('userCredentials', JSON.stringify(userCredentials));
+-    if (notificationSenderUsername) {
+-        localStorage.setItem('notificationSenderUsername', notificationSenderUsername);
+-    }
+-    localStorage.setItem('automaticNotificationsEnabled', JSON.stringify(automaticNotificationsEnabled));
++    sessionStorage.setItem('userCredentials', JSON.stringify(userCredentials));
++    if (notificationSenderUsername) {
++        sessionStorage.setItem('notificationSenderUsername', notificationSenderUsername);
++    }
++    sessionStorage.setItem('automaticNotificationsEnabled', JSON.stringify(automaticNotificationsEnabled));
+@@
+ export function updateNotificationConfig(senderUsername, notificationsEnabled) {
+     notificationSenderUsername = senderUsername;
+     automaticNotificationsEnabled = notificationsEnabled;
+     saveUserCredentials();
+     showFeedback('generator-feedback', 'Configurações de notificação salvas.', false);
+ }
+@@
+ export function setLoggedInState(user) {
+@@
+-    localStorage.setItem('currentUser', JSON.stringify(user));
++    sessionStorage.setItem('currentUser', JSON.stringify(user));
+@@
+ export function logout() {
+-    localStorage.removeItem('currentUser');
++    sessionStorage.removeItem('currentUser');
+@@
+     const currentUser = getCurrentUser();
+     if (currentUser && currentUser.username === originalUsername) {
+         // Atualiza apenas os campos relevantes no currentUser
+         currentUser.name = userCredentials[userToEditIndex].name;
+         currentUser.role = userCredentials[userToEditIndex].role;
+-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
++        sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+@@
+ export function updateWhatsApp(username, whatsapp) {
+@@
+     const currentUser = getCurrentUser();
+     if (currentUser && currentUser.username === username) {
+-        currentUser.whatsapp = whatsapp.trim();
+-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
++        currentUser.whatsapp = whatsapp.trim();
++        sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+*** End Patch
